@@ -122,6 +122,41 @@ private struct AccountTransfersTab: View {
     @AppStorage("account.newestFirst") private var newestFirst = true
     @State private var list = PagedList<Transfer>()
 
+    @State private var fields = FilterFields()
+    @State private var applied = FilterFields.Parsed()
+    @State private var filterError: Error?
+
+    @State private var searchText = ""
+    @State private var search: SearchState = .idle
+    @State private var isSearching = false
+    /// Set on submit; a `.task(id:)` performs the lookup. Keeping the id in state (read
+    /// through `self`) avoids capturing a bare `UInt128` in a `Task` closure, which was
+    /// miscompiled and corrupted the account id.
+    @State private var searchRequest: SearchRequest?
+    @State private var searchSerial = 0
+
+    private struct SearchRequest: Hashable {
+        let id: UInt128
+        let serial: Int
+    }
+
+    enum SearchState: Equatable {
+        case idle
+        case found(Transfer)
+        case elsewhere(Transfer)
+        case notFound(UInt128)
+        case invalid(String)
+    }
+
+    /// A transfer found by id replaces the scan in the table.
+    private var pinned: Transfer? {
+        if case .found(let t) = search { t } else { nil }
+    }
+
+    private var emptyText: String {
+        applied == FilterFields.Parsed() ? "No Transfers" : "No Transfers Match These Filters"
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 16) {
@@ -129,25 +164,169 @@ private struct AccountTransfersTab: View {
                 Toggle("Credits", isOn: Binding(get: { credits }, set: { if $0 || debits { credits = $0 } }))
                 Toggle("Newest First", isOn: $newestFirst)
                 Spacer()
-                Text("get_account_transfers").font(.caption.monospaced()).foregroundStyle(.tertiary)
+                Text(pinned == nil ? "get_account_transfers" : "lookup_transfers")
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.tertiary)
             }
             .toggleStyle(.checkbox)
             .controlSize(.small)
             .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.top, 8)
+            .disabled(pinned != nil)
+
+            FilterBar(fields: $fields, onApply: applyFilters)
+                .disabled(pinned != nil)
+            if let filterError {
+                ErrorBanner(error: filterError).padding(.horizontal, 12).padding(.bottom, 8)
+            }
+            if search != .idle {
+                Divider()
+                searchBanner
+            }
             Divider()
-            TransfersTable(list: list, perspective: account.id, emptyText: "No Transfers")
+            TransfersTable(list: list, perspective: account.id, emptyText: emptyText)
         }
-        .task(id: [account.id.description, "\(debits)", "\(credits)", "\(newestFirst)"]) {
+        .searchable(text: $searchText, placement: .toolbar, prompt: "Find Transfer by ID")
+        .onSubmit(of: .search, runSearch)
+        .onChange(of: searchText) { _, new in
+            if new.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { clearSearch() }
+        }
+        .task(id: searchRequest) { await performSearch() }
+        .task(id: TransfersQuery(
+            accountID: account.id, debits: debits, credits: credits, reversed: newestFirst,
+            filter: applied, pinnedID: pinned?.id
+        )) {
             guard let client = model.client else { return }
-            await list.reset(
-                source: AccountTransfersSource(
-                    client: client, accountID: account.id,
-                    base: AccountFilter(debits: debits, credits: credits, reversed: newestFirst)),
-                reversed: newestFirst)
+            if let t = pinned {
+                await list.reset(source: FixedSource(items: [t]), reversed: newestFirst)
+            } else {
+                let f = applied
+                await list.reset(
+                    source: AccountTransfersSource(
+                        client: client, accountID: account.id,
+                        base: AccountFilter(
+                            debits: debits, credits: credits, code: f.code, userData128: f.userData128,
+                            userData64: f.userData64, userData32: f.userData32, reversed: newestFirst)),
+                    reversed: newestFirst)
+            }
             model.observe(list.items)
         }
+        #if DEBUG
+        .onAppear(perform: applyDebugArguments)
+        #endif
     }
+
+    @ViewBuilder
+    private var searchBanner: some View {
+        HStack(spacing: 8) {
+            switch search {
+            case .idle:
+                EmptyView()
+            case .found(let t):
+                Label("Showing transfer \(String(t.id)) on this account", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+            case .elsewhere(let t):
+                Label(
+                    "Transfer \(String(t.id)) doesn’t involve this account (\(String(t.debitAccountID)) → \(String(t.creditAccountID)))",
+                    systemImage: "arrow.triangle.branch")
+                    .foregroundStyle(.orange)
+                RouteButton("Open Transfer", route: .transfer(t.id), open: model.open)
+                    .controlSize(.small)
+            case .notFound(let id):
+                Label("No transfer with ID \(String(id))", systemImage: "questionmark.circle")
+                    .foregroundStyle(.secondary)
+            case .invalid(let raw):
+                Label("“\(raw)” is not a valid ID. Use decimal or 0x-prefixed hex.", systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.red)
+            }
+            Spacer()
+            if isSearching { ProgressView().controlSize(.small) }
+            if pinned != nil {
+                Button("Show All Transfers", action: clearSearch)
+                    .buttonStyle(.borderless)
+            }
+        }
+        .lineLimit(1)
+        .font(.callout)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(.quaternary.opacity(0.4))
+    }
+
+    private func runSearch() {
+        let raw = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !raw.isEmpty else {
+            clearSearch()
+            return
+        }
+        guard let id = UInt128(tbString: raw) else {
+            searchRequest = nil
+            search = .invalid(raw)
+            return
+        }
+        searchSerial += 1
+        searchRequest = SearchRequest(id: id, serial: searchSerial)
+    }
+
+    private func performSearch() async {
+        guard let request = searchRequest, let client = model.client else { return }
+        isSearching = true
+        defer { isSearching = false }
+        do {
+            switch try await client.findTransfer(request.id, onAccount: account.id) {
+            case .onAccount(let t):
+                search = .found(t)
+            case .otherAccounts(let t):
+                search = .elsewhere(t)
+                model.observe([t])
+            case .notFound:
+                search = .notFound(request.id)
+            }
+            filterError = nil
+        } catch {
+            search = .idle
+            filterError = error
+        }
+    }
+
+    private func clearSearch() {
+        searchText = ""
+        search = .idle
+        searchRequest = nil
+    }
+
+    private func applyFilters() {
+        do {
+            applied = try fields.parse()
+            filterError = nil
+        } catch {
+            filterError = error
+        }
+    }
+
+    #if DEBUG
+    /// `-TBSearch <id>` and `-TBFilterCode <code>` for screenshots.
+    private func applyDebugArguments() {
+        let defaults = UserDefaults.standard
+        if let code = defaults.string(forKey: "TBFilterCode") {
+            fields.code = code
+            applyFilters()
+        }
+        if let id = defaults.string(forKey: "TBSearch") {
+            searchText = id
+            runSearch()
+        }
+    }
+    #endif
+}
+
+private struct TransfersQuery: Hashable {
+    let accountID: UInt128
+    let debits: Bool
+    let credits: Bool
+    let reversed: Bool
+    let filter: FilterFields.Parsed
+    let pinnedID: UInt128?
 }
 
 private struct BalanceHistoryTab: View {
