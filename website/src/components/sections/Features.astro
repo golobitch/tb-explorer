@@ -1,0 +1,25 @@
+---
+import Feature from "../cards/Feature.astro";
+import Container from "../shared/Container.astro";
+import Paragraph from "../shared/Paragraph.astro";
+import Title from "../shared/Title.astro";
+import { features } from "../../utils/data";
+---
+
+<section id="features">
+    <Container className="space-y-10 md:space-y-12">
+        <div class="text-center max-w-3xl mx-auto space-y-4">
+            <Title>
+                Everything in your cluster, one click away
+            </Title>
+            <Paragraph>
+                Follow money from ledger to account to transfer and back, without writing a single query by hand.
+            </Paragraph>
+        </div>
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+            {features.map((feature) => (
+                <Feature title={feature.title} description={feature.description} icon={feature.icon} />
+            ))}
+        </div>
+    </Container>
+</section>

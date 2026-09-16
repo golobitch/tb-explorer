@@ -1,0 +1,82 @@
+---
+import { withBase } from "../../lib/url";
+import { Image } from "astro:assets";
+import appIcon from "../../assets/app-icon.png";
+import { links, navItems } from "../../utils/data";
+import GroupFooterNav from "../blocks/GroupFooterNav.astro";
+import Container from "../shared/Container.astro";
+import FooterNav from "../shared/FooterNav.astro";
+import GithubIcon from "../shared/GithubIcon.astro";
+import Paragraph from "../shared/Paragraph.astro";
+
+const footerPage = navItems.map((item) => ({ itemText: item.text, itemLink: item.href }));
+
+const footerProject = [
+    { itemText: "GitHub", itemLink: links.github },
+    { itemText: "Releases", itemLink: links.releases },
+    { itemText: "README", itemLink: links.readme },
+    { itemText: "Issues", itemLink: links.issues },
+];
+
+const year = new Date().getFullYear();
+---
+<div class="mt-16"></div>
+<footer class="relative bg-gradient-to-tr from-[#F1EBDD] to-[#E9E1CF] dark:from-graphite dark:to-transparent pt-28 rounded-t-3xl">
+    <div class="absolute right-0 top-0 h-full w-full flex justify-end pointer-events-none">
+        <div class="w-28 h-28 overflow-hidden flex rounded-xl relative blur-2xl">
+            <span class="absolute w-16 h-16 -top-1 -right-1 bg-credit rounded-md rotate-45"></span>
+            <span class="absolute w-16 h-16 -bottom-1 -right-1 bg-primary rounded-md rotate-45"></span>
+            <span class="absolute w-16 h-16 -bottom-1 -left-1 bg-debit rounded-md rotate-45"></span>
+        </div>
+    </div>
+
+    <div class="absolute left-0 bottom-0 h-full w-full flex items-end pointer-events-none">
+        <div class="w-28 h-28 overflow-hidden flex rounded-xl relative blur-2xl">
+            <span class="absolute w-16 h-16 -top-1 -right-1 bg-credit rounded-md rotate-45"></span>
+            <span class="absolute w-16 h-16 -bottom-1 -right-1 bg-primary rounded-md rotate-45"></span>
+            <span class="absolute w-16 h-16 -bottom-1 -left-1 bg-debit rounded-md rotate-45"></span>
+        </div>
+    </div>
+    <Container className="pb-8 relative">
+        <span class="absolute top-1/2 left-1/2 -translate-y-1/2 -translate-x-1/2 blur-2xl opacity-20 w-24 h-16 sm:w-48 sm:h-36 rounded-full rotate-12 skew-x-6 bg-primary pointer-events-none"></span>
+        <div class="grid grid-cols-2 lg:grid-cols-3 lg:items-stretch gap-8 relative">
+            <div class="col-span-2 h-auto flex flex-col">
+                <div class="h-full">
+                    <a href={withBase()} class="relative flex items-center gap-3">
+                        <Image src={appIcon} alt="" width={36} height={36} densities={[1, 2]} class="w-9 h-9" />
+                        <div class="inline-flex text-lg font-semibold text-heading-1">
+                            TigerBeetle Explorer
+                        </div>
+                    </a>
+                    <Paragraph className="mt-8 max-w-xl">
+                        An independent, open-source, read-only macOS app for browsing{" "}<a href={links.tigerbeetle} target="_blank" rel="noopener noreferrer" class="underline decoration-primary underline-offset-4 hover:text-heading-1">TigerBeetle</a>{" "}clusters. Not an official TigerBeetle product, and not affiliated with or endorsed by the TigerBeetle team.
+                    </Paragraph>
+                </div>
+
+                <div class="min-h-max flex items-center gap-4 text-heading-3 mt-8">
+                    <a href={links.github} target="_blank" rel="noopener noreferrer" class="transition hover:text-heading-1 hover:scale-105">
+                        <GithubIcon className="w-5 h-5" />
+                        <span class="sr-only">TigerBeetle Explorer on GitHub</span>
+                    </a>
+                </div>
+            </div>
+
+            <GroupFooterNav>
+                <FooterNav title="On this page" navItems={footerPage} />
+                <FooterNav title="Project" navItems={footerProject} />
+            </GroupFooterNav>
+        </div>
+    </Container>
+    <div class="bg-gradient-to-tl from-box-bg py-3 relative">
+        <Container>
+            <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 sm:gap-6 text-sm md:text-base text-heading-3">
+                <div>
+                    &copy; {year} TigerBeetle Explorer contributors
+                </div>
+                <div>
+                    Site based on the <a href="https://github.com/uno-forge-hub/agency-landing-page-Astrojs" target="_blank" rel="noopener noreferrer" class="font-semibold hover:text-heading-1">AgenceX theme</a> by <a href="https://github.com/johnkat-mj" target="_blank" rel="noopener noreferrer" class="font-semibold hover:text-heading-1">John Kat</a> (MIT)
+                </div>
+            </div>
+        </Container>
+    </div>
+</footer>

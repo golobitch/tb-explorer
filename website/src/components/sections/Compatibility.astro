@@ -1,0 +1,84 @@
+---
+import { downloadAsset, links } from "../../utils/data";
+import Container from "../shared/Container.astro";
+import Paragraph from "../shared/Paragraph.astro";
+import Title from "../shared/Title.astro";
+
+const requirements = [
+    "macOS 15 or later",
+    "Universal app: runs natively on Apple Silicon and Intel Macs",
+    "A reachable TigerBeetle cluster running a compatible server release",
+    `Download ${downloadAsset} from the latest GitHub release`,
+];
+
+const compatibility = [
+    { app: "0.0.x", client: "0.17.9", server: "0.17.9" },
+];
+---
+
+<section id="compatibility">
+    <Container className="flex flex-col midmd:flex-row gap-10 lg:gap-12">
+        <div class="flex-1 flex midmd:w-7/12 lg:w-1/2 flex-col">
+            <Title>
+                Requirements &amp; compatibility
+            </Title>
+            <Paragraph className="mt-8">
+                The TigerBeetle client is compiled into the app, so it has to match your server.
+            </Paragraph>
+            <Paragraph className="mt-2">
+                The client protocol doesn't expose the server's release number. When the cluster evicts the
+                client with <em>release too low</em> or <em>release too high</em>, the mismatch shows up in the
+                connection list and the app refuses to connect.
+            </Paragraph>
+            <ul class="mt-8 space-y-4 text-heading-3 font-medium">
+                {requirements.map((item) => (
+                    <li class="flex items-start">
+                        <span class="font-bold bg-box-bg border border-box-border rounded-full min-w-8 w-8 h-8 mr-3 text-primary inline-flex justify-center items-center" aria-hidden="true">&check;</span>
+                        <span class="pt-1 break-words min-w-0">{item}</span>
+                    </li>
+                ))}
+            </ul>
+        </div>
+
+        <div class="max-w-xl mx-auto midmd:max-w-none lg:mx-0 lg:pl-10 xl:pl-2 flex-1 flex w-full midmd:w-5/12 lg:w-1/2 items-center">
+            <div class="w-full relative">
+                <div class="absolute rotate-45 -right-5 md:-right-10 p-1 top-1/2 w-16 h-16 bg-gradient-to-br from-primary to-debit blur-3xl opacity-50 pointer-events-none"></div>
+                <span class="absolute w-full aspect-[16/5] -skew-x-12 rounded-full bg-gradient-to-tr from-primary to-credit opacity-30 blur-2xl left-0 -bottom-6 pointer-events-none"></span>
+
+                <div class="relative rounded-3xl border border-box-border bg-box-bg shadow-lg shadow-box-shadow overflow-hidden">
+                    <div class="bg-graphite text-white px-6 py-4 flex items-center justify-between gap-4">
+                        <p class="font-semibold">Version compatibility</p>
+                        <span class="flex gap-1.5" aria-hidden="true">
+                            <span class="w-2.5 h-2.5 rounded-full bg-debit"></span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-primary"></span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-credit"></span>
+                        </span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-heading-2">
+                            <thead class="text-sm text-heading-3 border-b border-box-border">
+                                <tr>
+                                    <th scope="col" class="px-4 sm:px-6 py-3 font-medium">TigerBeetle Explorer</th>
+                                    <th scope="col" class="px-4 sm:px-6 py-3 font-medium"><code>tb_client</code></th>
+                                    <th scope="col" class="px-4 sm:px-6 py-3 font-medium">TigerBeetle server</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {compatibility.map((row) => (
+                                    <tr>
+                                        <td class="px-4 sm:px-6 py-4 font-semibold"><code>{row.app}</code></td>
+                                        <td class="px-4 sm:px-6 py-4"><code>{row.client}</code></td>
+                                        <td class="px-4 sm:px-6 py-4"><code>{row.server}</code></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="px-6 py-4 text-sm text-heading-3 border-t border-box-border">
+                        New rows are added as TigerBeetle is upgraded. See the{" "}<a href={links.readme} target="_blank" rel="noopener noreferrer" class="underline decoration-primary underline-offset-4 hover:text-heading-1">README</a>{" "}for the current table.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </Container>
+</section>

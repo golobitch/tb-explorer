@@ -1,0 +1,117 @@
+---
+import "../styles/global.css";
+import Footer from "../components/elements/Footer.astro";
+import Navbar from "../components/elements/Navbar.astro";
+import { withBase } from "../lib/url";
+
+export interface Props {
+  title?: string;
+  description?: string;
+}
+
+const siteName = "TigerBeetle Explorer";
+const {
+  title = `${siteName} · A native macOS app for browsing TigerBeetle clusters`,
+  description = "TigerBeetle Explorer is an independent, open-source, read-only macOS app for browsing TigerBeetle clusters: ledgers, accounts, transfers, balance history and pending → post/void chains.",
+} = Astro.props;
+
+// Absolute URLs for canonical and Open Graph; paths include the configured base.
+const absolute = (path: string) => (Astro.site ? new URL(path, Astro.site).toString() : path);
+const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).toString() : undefined;
+const ogImage = absolute(withBase("og-image.png"));
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    {canonical && <link rel="canonical" href={canonical} />}
+    <meta name="theme-color" content="#FAF7F0" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#15181E" media="(prefers-color-scheme: dark)" />
+
+    <link rel="icon" type="image/png" sizes="32x32" href={withBase("favicon-32x32.png")} />
+    <link rel="icon" type="image/png" sizes="16x16" href={withBase("favicon-16x16.png")} />
+    <link rel="icon" type="image/png" sizes="192x192" href={withBase("icon-192.png")} />
+    <link rel="apple-touch-icon" sizes="180x180" href={withBase("apple-touch-icon.png")} />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={siteName} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="TigerBeetle Explorer showing an account's balances and transfers" />
+    {canonical && <meta property="og:url" content={canonical} />}
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script is:inline>
+      try {
+        const stored = localStorage.getItem("appTheme");
+        if (stored === "dark" || (!stored && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+          document.documentElement.classList.add("dark");
+        }
+      } catch (_) {}
+    </script>
+  </head>
+  <body class="overflow-hidden overflow-y-auto bg-body">
+    <Navbar />
+    <slot />
+    <Footer />
+    <script>
+      const switchTheme = document.querySelector("[data-switch-theme]") as HTMLButtonElement | null;
+
+      if (switchTheme) {
+        switchTheme.addEventListener("click", (e) => {
+          e.preventDefault();
+          const isDark = document.documentElement.classList.toggle("dark");
+          try {
+            localStorage.setItem("appTheme", isDark ? "dark" : "light");
+          } catch (_) {}
+        });
+      }
+    </script>
+    <script>
+      const toggleMenu = document.querySelector("[data-toggle-nav]") as HTMLButtonElement | null;
+      const navbar = document.querySelector("[data-navbar]") as HTMLDivElement | null;
+      const overlayNav = document.querySelector("[data-nav-overlay]") as HTMLDivElement | null;
+
+      if (toggleMenu && navbar && overlayNav) {
+        const closeNav = () => {
+          toggleMenu.setAttribute("data-open-nav", "false");
+          overlayNav.setAttribute("data-is-visible", "false");
+          document.body.classList.remove("!overflow-y-hidden");
+          navbar.style.height = "";
+        };
+
+        toggleMenu.addEventListener("click", (e) => {
+          e.preventDefault();
+          if (toggleMenu.getAttribute("data-open-nav") === "false") {
+            toggleMenu.setAttribute("data-open-nav", "true");
+            overlayNav.setAttribute("data-is-visible", "true");
+            document.body.classList.add("!overflow-y-hidden");
+            navbar.style.height = `${navbar.scrollHeight}px`;
+          } else {
+            closeNav();
+          }
+        });
+
+        navbar.addEventListener("click", closeNav);
+        overlayNav.addEventListener("click", closeNav);
+      }
+    </script>
+  </body>
+</html>

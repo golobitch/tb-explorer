@@ -1,0 +1,60 @@
+---
+import { Image } from "astro:assets";
+import screenshot from "../../assets/app-accounts-view.png";
+import { links } from "../../utils/data";
+import BtnLink from "../shared/BtnLink.astro";
+import Container from "../shared/Container.astro";
+import GithubIcon from "../shared/GithubIcon.astro";
+import Paragraph from "../shared/Paragraph.astro";
+---
+
+<section class="relative pt-32 lg:pt-40">
+    <Container className="flex flex-col items-center gap-12 lg:gap-16 relative">
+        <span class="w-4/12 lg:w-2/12 aspect-square bg-gradient-to-tr from-primary to-credit absolute -top-5 left-0 rounded-full skew-y-12 blur-2xl opacity-30 skew-x-12 rotate-90 pointer-events-none"></span>
+        <span class="absolute right-4 top-24 w-24 h-24 rounded-3xl bg-debit blur-2xl opacity-40 hidden lg:block pointer-events-none"></span>
+
+        <div class="relative flex flex-col items-center text-center max-w-4xl mx-auto">
+            <span class="inline-flex items-center gap-2 rounded-full border border-box-border bg-box-bg px-4 py-1.5 text-sm font-medium text-heading-3 shadow-lg shadow-box-shadow">
+                <span class="w-2 h-2 rounded-full bg-credit" aria-hidden="true"></span>
+                Independent &amp; open source · for TigerBeetle clusters
+            </span>
+
+            <h1 class="mt-8 text-3xl/tight sm:text-4xl/tight md:text-5xl/tight xl:text-6xl/tight font-bold text-heading-1">
+                Browse your <span class="text-transparent bg-clip-text bg-gradient-to-br from-debit from-10% via-primary via-50% to-credit">TigerBeetle</span> clusters, natively on macOS.
+            </h1>
+            <Paragraph className="mt-8 max-w-2xl">
+                TigerBeetle Explorer is a read-only SwiftUI app for ledgers, accounts, transfers,
+                balance history, and pending → post/void chains. It talks to your cluster through
+                the official C client, with no helper process in between.
+            </Paragraph>
+
+            <div class="mt-10 flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+                <BtnLink href={links.download} external text="Download for macOS" variant="primary" className="w-full sm:w-auto">
+                    <svg slot="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                    </svg>
+                </BtnLink>
+                <BtnLink href={links.github} external text="View on GitHub" variant="secondary" className="w-full sm:w-auto">
+                    <GithubIcon slot="icon" className="w-5 h-5" />
+                </BtnLink>
+            </div>
+            <p class="mt-5 text-sm text-heading-3">
+                macOS 15 or later · Universal (Apple Silicon &amp; Intel) · Works with TigerBeetle 0.17.9
+            </p>
+        </div>
+
+        <div class="relative w-full max-w-6xl mx-auto">
+            <span class="absolute -left-6 md:left-4 top-1/4 w-24 h-24 rotate-90 skew-x-12 rounded-3xl bg-credit blur-2xl opacity-50 pointer-events-none"></span>
+            <span class="absolute right-4 -bottom-6 w-28 h-28 rounded-3xl bg-primary blur-2xl opacity-60 pointer-events-none"></span>
+            <Image
+                src={screenshot}
+                alt="TigerBeetle Explorer showing account 1004 with its balances and a list of debit and credit transfers"
+                widths={[640, 960, 1280, 1920, 2846]}
+                sizes="(min-width: 1280px) 1152px, 100vw"
+                loading="eager"
+                fetchpriority="high"
+                class="relative w-full h-auto drop-shadow-2xl"
+            />
+        </div>
+    </Container>
+</section>
