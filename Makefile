@@ -5,7 +5,14 @@ TB_ADDR      ?= 127.0.0.1:3000
 DERIVED      := build/DerivedData
 XCB          := xcodebuild -project TBExplorer.xcodeproj -derivedDataPath $(DERIVED)
 
-.PHONY: generate open build release test integration seed tb tb-format tb-start tb-up tb-stop tb-reset vendor clean
+.PHONY: icon generate open build release test integration seed tb tb-format tb-start tb-up tb-stop tb-reset vendor clean
+
+ICONSET := Sources/TBExplorer/Assets.xcassets/AppIcon.appiconset
+
+# Render the app icon at 1024px and derive every size the asset catalog needs.
+icon:
+	swift scripts/render-icon.swift $(ICONSET)/icon_1024.png
+	for s in 16 32 64 128 256 512; do sips -z $$s $$s $(ICONSET)/icon_1024.png --out $(ICONSET)/icon_$$s.png >/dev/null; done
 
 generate:
 	xcodegen generate --quiet
