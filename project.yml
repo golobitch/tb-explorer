@@ -1,0 +1,35 @@
+name: TBExplorer
+
+options:
+  bundleIdPrefix: com.golobitch
+  deploymentTarget:
+    macOS: "15.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+
+settingGroups:
+  tigerbeetle:
+    # CTigerBeetle module (tb_client.h + module.modulemap) and the vendored universal static lib.
+    SWIFT_INCLUDE_PATHS: $(SRCROOT)/Vendor/tigerbeetle/include
+    HEADER_SEARCH_PATHS: $(SRCROOT)/Vendor/tigerbeetle/include
+    LIBRARY_SEARCH_PATHS: $(SRCROOT)/Vendor/tigerbeetle/lib
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MACOSX_DEPLOYMENT_TARGET: "15.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    DEAD_CODE_STRIPPING: YES
+
+targets:
+  TBKit:
+    type: library.static
+    platform: macOS
+    sources:
+      - path: Sources/TBKit
+    settings:
+      groups: [tigerbeetle]
+      base:
+        # Swift-only library; no Objective-C interface header to install.
+        SWIFT_INSTALL_OBJC_HEADER: NO
