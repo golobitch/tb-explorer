@@ -39,8 +39,6 @@ enum Wire {
         static let timestampMin = 40, timestampMax = 48, limit = 56, flags = 60
     }
 
-    // MARK: Decoding
-
     static func decode<T>(_ bytes: [UInt8], size: Int, _ one: (UnsafeRawBufferPointer, Int) -> T) -> [T] {
         precondition(bytes.count % size == 0, "misaligned TigerBeetle reply: \(bytes.count) bytes")
         return bytes.withUnsafeBytes { raw in
@@ -101,8 +99,6 @@ enum Wire {
             )
         }
     }
-
-    // MARK: Encoding
 
     struct Writer {
         var bytes: [UInt8]

@@ -36,8 +36,6 @@ final class AppModel {
 
     var isConnected: Bool { client != nil }
 
-    // MARK: Connection
-
     func connect(_ saved: SavedConnection) async throws {
         guard let clusterID = UInt128(tbString: saved.clusterID) else {
             throw TBError.invalidClusterID(saved.clusterID)
@@ -80,8 +78,6 @@ final class AppModel {
         self.info = info
     }
 
-    // MARK: Navigation
-
     func select(_ item: SidebarItem) {
         sidebar = item
         path = []
@@ -113,8 +109,6 @@ final class AppModel {
             throw TBError.notFound("Account or transfer \(id)")
         }
     }
-
-    // MARK: Ledger discovery
 
     func observe(ledger: UInt32) {
         guard ledger != 0, !ledgers.contains(ledger) else { return }

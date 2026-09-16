@@ -23,8 +23,12 @@ open: generate
 build: generate
 	$(XCB) -scheme TBExplorer -configuration Debug build | xcbeautify 2>/dev/null || $(XCB) -scheme TBExplorer -configuration Debug build -quiet
 
+# Release builds can override the version from project.yml, e.g.
+#   make release VERSION=0.0.3 BUILD_NUMBER=42
+VERSION_FLAGS := $(if $(VERSION),MARKETING_VERSION=$(VERSION)) $(if $(BUILD_NUMBER),CURRENT_PROJECT_VERSION=$(BUILD_NUMBER))
+
 release: generate
-	$(XCB) -scheme TBExplorer -configuration Release -arch arm64 -arch x86_64 ONLY_ACTIVE_ARCH=NO build -quiet
+	$(XCB) -scheme TBExplorer -configuration Release -arch arm64 -arch x86_64 ONLY_ACTIVE_ARCH=NO $(VERSION_FLAGS) build -quiet
 	@echo "App: $(DERIVED)/Build/Products/Release/TigerBeetle Explorer.app"
 
 # Unit + integration tests. The scheme's Test pre-action starts and seeds the dev cluster.

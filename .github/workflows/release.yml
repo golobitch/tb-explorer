@@ -22,8 +22,30 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
+      # The tag is the version: v0.0.3 builds as 0.0.3, with the run number as the build number.
+      - name: Version from tag
+        id: version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Tag '$GITHUB_REF_NAME' must look like vMAJOR.MINOR.PATCH (e.g. v0.0.3)"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
       - name: Build universal app
-        run: make release
+        run: make release VERSION=${{ steps.version.outputs.version }} BUILD_NUMBER=${{ github.run_number }}
+
+      - name: Check app version
+        run: |
+          PLIST="build/DerivedData/Build/Products/Release/TigerBeetle Explorer.app/Contents/Info.plist"
+          ACTUAL=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$PLIST")
+          BUILD=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$PLIST")
+          echo "Built version $ACTUAL ($BUILD)"
+          if [ "$ACTUAL" != "${{ steps.version.outputs.version }}" ]; then
+            echo "::error::App version $ACTUAL does not match tag ${{ steps.version.outputs.version }}"
+            exit 1
+          fi
 
       # Signs with a Developer ID and notarizes only when the secrets are configured;
       # otherwise the ad-hoc signed app is published as-is.
