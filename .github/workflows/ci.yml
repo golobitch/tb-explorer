@@ -3,7 +3,13 @@ name: ci
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - website/**
+      - .github/workflows/pages.yml
   pull_request:
+    paths-ignore:
+      - website/**
+      - .github/workflows/pages.yml
 
 env:
   TB_VERSION: 0.17.9
