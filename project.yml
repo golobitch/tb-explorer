@@ -34,6 +34,28 @@ targets:
         # Swift-only library; no Objective-C interface header to install.
         SWIFT_INSTALL_OBJC_HEADER: NO
 
+  TBExplorer:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/TBExplorer
+    dependencies:
+      - target: TBKit
+    settings:
+      groups: [tigerbeetle]
+      base:
+        PRODUCT_NAME: TigerBeetle Explorer
+        PRODUCT_BUNDLE_IDENTIFIER: com.golobitch.tb-explorer
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_ENTITLEMENTS: Sources/TBExplorer/TBExplorer.entitlements
+        ENABLE_HARDENED_RUNTIME: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        INFOPLIST_KEY_CFBundleDisplayName: TigerBeetle Explorer
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
+        INFOPLIST_KEY_NSHumanReadableCopyright: ""
+        GENERATE_INFOPLIST_FILE: YES
+
   TBKitTests:
     type: bundle.unit-test
     platform: macOS
@@ -59,6 +81,16 @@ targets:
         CODE_SIGN_IDENTITY: "-"
 
 schemes:
+  TBExplorer:
+    build:
+      targets:
+        TBExplorer: all
+        TBKitTests: [test]
+    run:
+      config: Debug
+    test:
+      targets:
+        - TBKitTests
   tb-seed:
     build:
       targets:
