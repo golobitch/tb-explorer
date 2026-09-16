@@ -6,6 +6,8 @@ A native macOS app for browsing [TigerBeetle](https://tigerbeetle.com) clusters:
 
 It's written in SwiftUI and talks to TigerBeetle through the official C client (`tb_client`), linked in as a static library. There's no bundled server or helper process. The app is macOS only and requires macOS 15.
 
+![TigerBeetle Explorer showing an account's balances and transfers](docs/images/app-accounts-view.png)
+
 ## Version compatibility
 
 The TigerBeetle client is compiled into the app and must be compatible with the server. A mismatch appears in the connection list and the app refuses to connect.
@@ -99,6 +101,7 @@ Pushing a `v*` tag runs the release workflow, which publishes a zipped app and `
 
 ```
 project.yml                 XcodeGen spec (app, TBKit, tests, tb-seed)
+docs/images/                screenshots used by this README
 Vendor/tigerbeetle/         tb_client.h, module map, universal libtb_client.a, VERSION
 Sources/TBKit/              read-only Swift client over tb_client
   TBClient.swift            async submit, packet lifetimes, timeouts, errors
