@@ -86,11 +86,31 @@ schemes:
       targets:
         TBExplorer: all
         TBKitTests: [test]
+        # Built alongside so the pre-action can seed a freshly formatted cluster.
+        tb-seed: [run, test]
     run:
       config: Debug
+      preActions:
+        - name: Ensure dev cluster
+          settingsTarget: TBExplorer
+          script: |
+            mkdir -p "${SRCROOT}/.tigerbeetle"
+            "${SRCROOT}/scripts/dev-cluster.sh" >> "${SRCROOT}/.tigerbeetle/dev-cluster.log" 2>&1 || true
+      commandLineArguments:
+        # Debug-only hook: connect straight to the dev cluster.
+        "-TBConnect 127.0.0.1:3000": true
     test:
       targets:
         - TBKitTests
+      preActions:
+        - name: Ensure dev cluster
+          settingsTarget: TBExplorer
+          script: |
+            mkdir -p "${SRCROOT}/.tigerbeetle"
+            "${SRCROOT}/scripts/dev-cluster.sh" >> "${SRCROOT}/.tigerbeetle/dev-cluster.log" 2>&1 || true
+      environmentVariables:
+        # Enables the integration suite.
+        TB_ADDRESS: 127.0.0.1:3000
   tb-seed:
     build:
       targets:
