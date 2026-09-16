@@ -1,54 +1,43 @@
-<h1>AgenceX Landing page</h1>
+# TigerBeetle Explorer landing page
 
-A simple landing page for a digital agency
+Marketing site for [TigerBeetle Explorer](https://github.com/golobitch/tb-explorer), an independent, open-source, read-only macOS app for browsing TigerBeetle clusters.
 
-![AgenceX light Theme](./screens/demoLight.webp)
-![AgenceX Dark Theme](./screens/demoDark.webp)
+It's a static [Astro](https://astro.build) site styled with Tailwind CSS v4.
 
+## Development
 
-## Tools
-- TailwindCSS v4
-- AstroJs v5
+Requires Node 20 or later.
 
-
-## 🚀 Project Structure
-
-Inside of your Astro project, you'll see the following folders and files:
-
-```
-/
-├── public/
-│   ├── images/
-│   ├── logos/*
-│   └── favicon.svg
-├── src/
-│   ├── components/
-│   │   ├── blocks/*
-│   │   ├── cards/*
-│   │   ├── elements/*
-│   │   ├── sections/*
-│   │   ├── shared/*
-│   ├── layouts/
-│   │   └── Layout.astro
-│   └── pages/
-│       └── index.astro
-│   └── styles/
-│       └── global.css
-└── package.json
+```sh
+npm install          # install dependencies
+npm run dev          # dev server at http://localhost:4321
+npm run build        # static build into dist/
+npm run preview      # serve the dist/ build locally
 ```
 
+Set `SITE_URL` when building for production so canonical and Open Graph URLs are absolute:
 
-## 🧞 Commands
+```sh
+SITE_URL=https://example.com npm run build
+```
 
-All commands are run from the root of the project, from a terminal:
+## Deploying
 
-| Command                | Action                                           |
-| :--------------------- | :----------------------------------------------- |
-| `npm install`          | Installs dependencies                            |
-| `npm run dev`          | Starts local dev server at `localhost:4321`      |
-| `npm run build`        | Build your production site to `./dist/`          |
-| `npm run preview`      | Preview your build locally, before deploying     |
-| `npm run astro ...`    | Run CLI commands like `astro add`, `astro check` |
-| `npm run astro --help` | Get help using the Astro CLI                     |
+`npm run build` writes a fully static site to `dist/`. Upload that folder to any static host, such as GitHub Pages, Cloudflare Pages, Netlify or an S3 bucket behind a CDN.
 
+## Layout
 
+```
+src/pages/index.astro         page composition
+src/components/sections/      Hero, Features, ReadOnly, Compatibility, OpenSource
+src/components/elements/      Navbar, Footer
+src/utils/data.ts             links, nav items and feature copy
+src/assets/                   app screenshot and icon (optimized at build time)
+public/                       favicons and Open Graph image
+```
+
+Page copy should stay in line with the app's [README](https://github.com/golobitch/tb-explorer#readme).
+
+## Credits
+
+Based on the [AgenceX Astro theme](https://github.com/uno-forge-hub/agency-landing-page-Astrojs) by John Kat, used under the MIT License. See [LICENCE.md](LICENCE.md).
