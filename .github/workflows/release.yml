@@ -10,6 +10,9 @@ permissions:
 jobs:
   macos:
     runs-on: macos-15
+    env:
+      # A step's own env is not visible to its `if`, so expose signing availability at job level.
+      SIGNING_ENABLED: ${{ secrets.MACOS_CERT_P12 != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -25,7 +28,7 @@ jobs:
       # Signs with a Developer ID and notarizes only when the secrets are configured;
       # otherwise the ad-hoc signed app is published as-is.
       - name: Sign and notarize
-        if: env.MACOS_CERT_P12 != ''
+        if: env.SIGNING_ENABLED == 'true'
         env:
           MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
           MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
@@ -47,6 +50,8 @@ jobs:
           ditto -c -k --keepParent "$APP" notarize.zip
           xcrun notarytool submit notarize.zip --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" --wait
           xcrun stapler staple "$APP"
+          security delete-keychain build.keychain
+          rm -f cert.p12 notarize.zip
 
       - name: Package
         run: |
