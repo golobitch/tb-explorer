@@ -2,6 +2,7 @@
 import "../styles/global.css";
 import Footer from "../components/elements/Footer.astro";
 import Navbar from "../components/elements/Navbar.astro";
+import { withBase } from "../lib/url";
 
 export interface Props {
   title?: string;
@@ -14,10 +15,10 @@ const {
   description = "TigerBeetle Explorer is an independent, open-source, read-only macOS app for browsing TigerBeetle clusters: ledgers, accounts, transfers, balance history and pending → post/void chains.",
 } = Astro.props;
 
-// Absolute URLs need `site` (set SITE_URL at build time); fall back to root-relative paths.
+// Absolute URLs for canonical and Open Graph; paths include the configured base.
 const absolute = (path: string) => (Astro.site ? new URL(path, Astro.site).toString() : path);
 const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).toString() : undefined;
-const ogImage = absolute("/og-image.png");
+const ogImage = absolute(withBase("og-image.png"));
 ---
 
 <!doctype html>
@@ -32,10 +33,10 @@ const ogImage = absolute("/og-image.png");
     <meta name="theme-color" content="#FAF7F0" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#15181E" media="(prefers-color-scheme: dark)" />
 
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
-    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href={withBase("favicon-32x32.png")} />
+    <link rel="icon" type="image/png" sizes="16x16" href={withBase("favicon-16x16.png")} />
+    <link rel="icon" type="image/png" sizes="192x192" href={withBase("icon-192.png")} />
+    <link rel="apple-touch-icon" sizes="180x180" href={withBase("apple-touch-icon.png")} />
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content={siteName} />

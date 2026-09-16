@@ -1,4 +1,5 @@
 ---
+import { withBase } from "../../lib/url";
 import { Image } from "astro:assets";
 import appIcon from "../../assets/app-icon.png";
 import { links, navItems } from "../../utils/data";
@@ -13,7 +14,7 @@ import Navitem from "../shared/Navitem.astro";
         <nav class="w-full flex justify-between gap-6 relative">
             <!-- logo -->
             <div class="min-w-max inline-flex relative">
-                <a href="/" class="relative flex items-center gap-3">
+                <a href={withBase()} class="relative flex items-center gap-3">
                     <Image src={appIcon} alt="" width={36} height={36} densities={[1, 2]} class="w-9 h-9" loading="eager" />
                     <div class="inline-flex text-lg font-semibold text-heading-1">
                         TigerBeetle Explorer

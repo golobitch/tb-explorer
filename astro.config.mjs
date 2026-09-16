@@ -4,9 +4,10 @@ import tailwindcss from "@tailwindcss/vite";
 
 // https://astro.build/config
 export default defineConfig({
-  // Set SITE_URL (e.g. https://tb-explorer.example.com) at build time to get
-  // absolute canonical and Open Graph URLs.
-  site: process.env.SITE_URL || undefined,
+  // Published on GitHub Pages at https://golobitch.github.io/tb-explorer/.
+  // Override with SITE_URL and BASE_PATH to host elsewhere (BASE_PATH=/ for a domain root).
+  site: process.env.SITE_URL || 'https://golobitch.github.io',
+  base: process.env.BASE_PATH || '/tb-explorer',
   vite: {
     plugins: [tailwindcss()],
   },

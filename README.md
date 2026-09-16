@@ -10,20 +10,22 @@ Requires Node 20 or later.
 
 ```sh
 npm install          # install dependencies
-npm run dev          # dev server at http://localhost:4321
+npm run dev          # dev server at http://localhost:4321/tb-explorer/
 npm run build        # static build into dist/
-npm run preview      # serve the dist/ build locally
+npm run preview      # serve the dist/ build at http://localhost:4321/tb-explorer/
 ```
 
-Set `SITE_URL` when building for production so canonical and Open Graph URLs are absolute:
+The site is configured for its GitHub Pages address, `https://golobitch.github.io/tb-explorer/`. That's why it's served under `/tb-explorer/` locally too. To host it elsewhere, override both values at build time:
 
 ```sh
-SITE_URL=https://example.com npm run build
+SITE_URL=https://example.com BASE_PATH=/ npm run build
 ```
+
+Links to public files and pages go through `withBase()` in `src/lib/url.ts`, so they keep working under any base path.
 
 ## Deploying
 
-`npm run build` writes a fully static site to `dist/`. Upload that folder to any static host, such as GitHub Pages, Cloudflare Pages, Netlify or an S3 bucket behind a CDN.
+The site lives in the `website/` folder of the [tb-explorer](https://github.com/golobitch/tb-explorer) repo. The `pages` workflow there builds it and deploys `dist/` to GitHub Pages on every push to `main` that touches `website/`. It can also be run by hand from the Actions tab.
 
 ## Layout
 
@@ -32,6 +34,7 @@ src/pages/index.astro         page composition
 src/components/sections/      Hero, Features, ReadOnly, Compatibility, OpenSource
 src/components/elements/      Navbar, Footer
 src/utils/data.ts             links, nav items and feature copy
+src/lib/url.ts                base-path aware links
 src/assets/                   app screenshot and icon (optimized at build time)
 public/                       favicons and Open Graph image
 ```
