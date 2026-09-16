@@ -1,0 +1,52 @@
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+env:
+  TB_VERSION: 0.17.9
+  TB_ADDR: 127.0.0.1:3000
+
+jobs:
+  test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.3.app
+
+      - name: Read-only guard
+        # The app and TBKit must never write to a cluster; only Tools/tb-seed may create.
+        run: |
+          if grep -rnE 'CREATE_(ACCOUNTS|TRANSFERS)|create_accounts|create_transfers' Sources; then
+            echo "create operations are not allowed in Sources/" >&2
+            exit 1
+          fi
+
+      - name: Vendored client matches pinned release
+        run: test "$(cat Vendor/tigerbeetle/VERSION)" = "$TB_VERSION"
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Start TigerBeetle
+        run: |
+          make tb-format
+          nohup .bin/tigerbeetle start --addresses=$TB_ADDR --development .tigerbeetle/0_0.tigerbeetle > .tigerbeetle/server.log 2>&1 &
+          for i in $(seq 1 60); do nc -z 127.0.0.1 3000 && break; sleep 1; done
+
+      - name: Seed
+        run: make seed TB_ADDR=$TB_ADDR
+
+      - name: Unit and integration tests
+        run: make integration TB_ADDR=$TB_ADDR
+
+      - name: Release build (universal)
+        run: make release
+
+      - name: Server log
+        if: failure()
+        run: tail -100 .tigerbeetle/server.log

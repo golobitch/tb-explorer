@@ -1,0 +1,61 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.3.app
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Build universal app
+        run: make release
+
+      # Signs with a Developer ID and notarizes only when the secrets are configured;
+      # otherwise the ad-hoc signed app is published as-is.
+      - name: Sign and notarize
+        if: env.MACOS_CERT_P12 != ''
+        env:
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          APP="build/DerivedData/Build/Products/Release/TigerBeetle Explorer.app"
+          echo "$MACOS_CERT_P12" | base64 --decode > cert.p12
+          security create-keychain -p ci build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p ci build.keychain
+          security import cert.p12 -k build.keychain -P "$MACOS_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k ci build.keychain
+          codesign --force --deep --options runtime --timestamp \
+            --entitlements Sources/TBExplorer/TBExplorer.entitlements \
+            --sign "$MACOS_SIGN_IDENTITY" "$APP"
+          ditto -c -k --keepParent "$APP" notarize.zip
+          xcrun notarytool submit notarize.zip --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" --wait
+          xcrun stapler staple "$APP"
+
+      - name: Package
+        run: |
+          ditto -c -k --keepParent "build/DerivedData/Build/Products/Release/TigerBeetle Explorer.app" TigerBeetle-Explorer-macos-universal.zip
+          shasum -a 256 TigerBeetle-Explorer-macos-universal.zip > SHA256SUMS
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            TigerBeetle-Explorer-macos-universal.zip
+            SHA256SUMS
+          generate_release_notes: true
