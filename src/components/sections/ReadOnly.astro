@@ -1,0 +1,69 @@
+---
+import Info from "../cards/Info.astro";
+import Container from "../shared/Container.astro";
+import Paragraph from "../shared/Paragraph.astro";
+import Title from "../shared/Title.astro";
+---
+
+<section id="read-only">
+    <Container className="flex flex-col midmd:flex-row gap-10 lg:gap-12">
+        <div class="max-w-md mx-auto midmd:max-w-none lg:mx-0 lg:pr-10 xl:pr-2 flex-1 flex w-full midmd:w-5/12 lg:w-1/2">
+            <div class="w-full relative flex items-center">
+                <div class="absolute rotate-45 -left-5 md:-left-10 lg:-left-20 p-1 top-1/2 w-16 h-16 bg-gradient-to-br from-primary to-debit blur-3xl opacity-50 pointer-events-none"></div>
+                <div class="absolute p-1 -top-4 md:-top-10 right-0 w-20 h-20 bg-gradient-to-br from-primary to-debit rounded-full blur-3xl opacity-60 pointer-events-none"></div>
+                <span class="absolute w-full aspect-[16/5] -skew-x-12 rounded-full bg-gradient-to-tr from-primary to-credit opacity-30 blur-2xl left-0 bottom-0 pointer-events-none"></span>
+
+                <!-- how it works -->
+                <div class="relative w-full rounded-3xl border border-box-border bg-box-bg shadow-lg shadow-box-shadow p-6 sm:p-8 space-y-3 font-medium">
+                    <p class="text-sm uppercase tracking-wider text-heading-3">How it connects</p>
+                    <div class="rounded-2xl bg-graphite text-white px-5 py-4">
+                        <p class="font-semibold">TigerBeetle Explorer</p>
+                        <p class="text-sm text-gray-300">SwiftUI app · macOS 15+</p>
+                    </div>
+                    <div class="rounded-2xl border-2 border-dashed border-primary px-5 py-4 text-heading-1">
+                        <p class="font-semibold"><code>tb_client</code> <span class="text-heading-3 font-normal">(official C client)</span></p>
+                        <p class="text-sm text-heading-3">Linked in as a static library, in-process</p>
+                    </div>
+                    <div class="flex justify-center text-primary" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 7.5L12 3m0 0l4.5 4.5M12 3v18m4.5-4.5L12 21m0 0l-4.5-4.5" /></svg>
+                    </div>
+                    <div class="rounded-2xl border border-box-border px-5 py-4 text-heading-1">
+                        <p class="font-semibold">Your TigerBeetle cluster</p>
+                        <p class="text-sm text-heading-3">Lookups and queries only</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="flex-1 flex midmd:w-7/12 lg:w-1/2 flex-col">
+            <Title>
+                Read-only by design
+            </Title>
+            <Paragraph className="mt-8">
+                TigerBeetle Explorer never issues <code>create_accounts</code> or <code>create_transfers</code>,
+                and the project's CI enforces it. Point it at a cluster to look around without worrying about
+                changing what's in it.
+            </Paragraph>
+            <Paragraph className="mt-4">
+                ids, amounts and user_data stay <code>UInt128</code> / <code>UInt64</code> end to end, with no strings
+                or floating point. The balance chart is the one exception: it plots <code>Double</code>, while its hover
+                readout and tables show exact values.
+            </Paragraph>
+            <div class="pt-8 grid sm:grid-cols-2 items-stretch gap-4">
+                <Info title="Official C client" description="Talks to TigerBeetle through tb_client, compiled into the app. No bundled server, no helper process.">
+                    <span slot="icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                        </svg>
+                    </span>
+                </Info>
+                <Info title="No writes, ever" description="Only lookups and queries, such as query_accounts, get_account_transfers and get_account_balances.">
+                    <span slot="icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                        </svg>
+                    </span>
+                </Info>
+            </div>
+        </div>
+    </Container>
+</section>
