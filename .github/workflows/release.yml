@@ -37,21 +37,50 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: |
+          set -euo pipefail
           APP="build/DerivedData/Build/Products/Release/TigerBeetle Explorer.app"
-          echo "$MACOS_CERT_P12" | base64 --decode > cert.p12
-          security create-keychain -p ci build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p ci build.keychain
-          security import cert.p12 -k build.keychain -P "$MACOS_CERT_PASSWORD" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k ci build.keychain
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          cleanup() { security delete-keychain "$KEYCHAIN" 2>/dev/null || true; rm -f "$RUNNER_TEMP/cert.p12" notarize.zip; }
+          trap cleanup EXIT
+
+          # Temporary keychain holding the Developer ID certificate.
+          echo "$MACOS_CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$MACOS_CERT_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+
+          if ! security find-identity -v -p codesigning "$KEYCHAIN" | grep -qF "$MACOS_SIGN_IDENTITY"; then
+            echo "::error::Signing identity '$MACOS_SIGN_IDENTITY' not found in the imported certificate. Identities present:"
+            security find-identity -v -p codesigning "$KEYCHAIN"
+            exit 1
+          fi
+
+          # Sign with hardened runtime and a secure timestamp (both required for notarization).
           codesign --force --deep --options runtime --timestamp \
             --entitlements Sources/TBExplorer/TBExplorer.entitlements \
-            --sign "$MACOS_SIGN_IDENTITY" "$APP"
+            --keychain "$KEYCHAIN" --sign "$MACOS_SIGN_IDENTITY" "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+
+          # Notarize; print Apple's log if the submission is not accepted.
           ditto -c -k --keepParent "$APP" notarize.zip
-          xcrun notarytool submit notarize.zip --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" --wait
+          RESULT=$(xcrun notarytool submit notarize.zip --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_PASSWORD" --wait --output-format json)
+          echo "$RESULT"
+          STATUS=$(echo "$RESULT" | jq -r .status)
+          if [ "$STATUS" != "Accepted" ]; then
+            echo "::error::Notarization status: $STATUS"
+            xcrun notarytool log "$(echo "$RESULT" | jq -r .id)" --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD"
+            exit 1
+          fi
+
+          # Attach the ticket so the app verifies offline, then confirm Gatekeeper accepts it.
           xcrun stapler staple "$APP"
-          security delete-keychain build.keychain
-          rm -f cert.p12 notarize.zip
+          xcrun stapler validate "$APP"
+          spctl --assess --type execute --verbose=4 "$APP"
 
       - name: Package
         run: |
