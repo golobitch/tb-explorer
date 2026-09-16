@@ -30,6 +30,12 @@ struct GoCommands: Commands {
             Button("Overview") { model.select(.overview) }
                 .keyboardShortcut("1")
                 .disabled(!model.isConnected)
+            Button("Accounts") { model.select(.accounts) }
+                .keyboardShortcut("2")
+                .disabled(!model.isConnected)
+            Button("Transfers") { model.select(.transfers) }
+                .keyboardShortcut("3")
+                .disabled(!model.isConnected)
             Button("Search") { model.select(.search) }
                 .keyboardShortcut("f", modifiers: [.command, .shift])
                 .disabled(!model.isConnected)

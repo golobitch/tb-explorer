@@ -5,6 +5,8 @@ import TBKit
 enum SidebarItem: Hashable {
     case overview
     case search
+    case accounts
+    case transfers
     case ledger(UInt32)
 }
 

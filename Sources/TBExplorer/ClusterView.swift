@@ -40,6 +40,8 @@ struct ClusterView: View {
         switch model.sidebar ?? .overview {
         case .overview: OverviewView()
         case .search: SearchView()
+        case .accounts: AllAccountsView()
+        case .transfers: AllTransfersView()
         case .ledger(let l): LedgerView(ledger: l).id(l)
         }
     }
@@ -57,6 +59,12 @@ private struct Sidebar: View {
                     .tag(SidebarItem.overview)
                 Label("Search", systemImage: "magnifyingglass")
                     .tag(SidebarItem.search)
+            }
+            Section("Data") {
+                Label("Accounts", systemImage: "person.2")
+                    .tag(SidebarItem.accounts)
+                Label("Transfers", systemImage: "arrow.left.arrow.right")
+                    .tag(SidebarItem.transfers)
             }
             Section("Ledgers") {
                 if model.ledgers.isEmpty {
