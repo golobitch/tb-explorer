@@ -1,11 +1,15 @@
 import AppKit
 import CoreGraphics
 
-// Renders the TigerBeetle Explorer app icon at 1024×1024 following the macOS
-// icon template: an 824pt rounded tile centered on the canvas with a drop shadow.
+// Renders the TigerBeetle Explorer app icon at 1024×1024: a light ledger sheet with
+// debit (orange) and credit (teal) rows and a small amber magnifier, on a cream tile
+// following the macOS icon template (824pt rounded tile centered with a drop shadow).
+//
+// Usage: swift scripts/render-icon.swift <output.png>   (or: make icon)
 
 let size = 1024
 let out = CommandLine.arguments.dropFirst().first ?? "icon_1024.png"
+let space = CGColorSpace(name: CGColorSpace.sRGB)!
 
 func rgb(_ hex: UInt32, _ alpha: CGFloat = 1) -> CGColor {
     CGColor(
@@ -15,136 +19,123 @@ func rgb(_ hex: UInt32, _ alpha: CGFloat = 1) -> CGColor {
         alpha: alpha)
 }
 
-let space = CGColorSpace(name: CGColorSpace.sRGB)!
+func gradient(_ colors: [UInt32], _ locations: [CGFloat]? = nil) -> CGGradient {
+    CGGradient(colorsSpace: space, colors: colors.map { rgb($0) } as CFArray, locations: locations)!
+}
+
+func roundedBar(_ ctx: CGContext, _ rect: CGRect, _ color: CGColor) {
+    ctx.addPath(CGPath(roundedRect: rect, cornerWidth: rect.height / 2, cornerHeight: rect.height / 2, transform: nil))
+    ctx.setFillColor(color)
+    ctx.fillPath()
+}
+
 guard let ctx = CGContext(
     data: nil, width: size, height: size, bitsPerComponent: 8, bytesPerRow: 0,
     space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
 else { fatalError("context") }
 
 // CoreGraphics origin is bottom-left.
-let tile = CGRect(x: 100, y: 100, width: 824, height: 824)
-let tilePath = CGPath(roundedRect: tile, cornerWidth: 185, cornerHeight: 185, transform: nil)
 
-// Drop shadow under the tile.
+// MARK: Tile
+
+let tileRect = CGRect(x: 100, y: 100, width: 824, height: 824)
+let tilePath = CGPath(roundedRect: tileRect, cornerWidth: 185, cornerHeight: 185, transform: nil)
+
 ctx.saveGState()
 ctx.setShadow(offset: CGSize(width: 0, height: -12), blur: 28, color: rgb(0x000000, 0.35))
 ctx.addPath(tilePath)
-ctx.setFillColor(rgb(0x1A1D24))
+ctx.setFillColor(rgb(0xE6DFD2))
 ctx.fillPath()
 ctx.restoreGState()
 
-// Tile: graphite vertical gradient.
 ctx.saveGState()
 ctx.addPath(tilePath)
 ctx.clip()
-let tileGradient = CGGradient(
-    colorsSpace: space,
-    colors: [rgb(0x343A46), rgb(0x1C1F27), rgb(0x111318)] as CFArray,
-    locations: [0, 0.55, 1])!
-ctx.drawLinearGradient(tileGradient, start: CGPoint(x: 512, y: 924), end: CGPoint(x: 512, y: 100), options: [])
-
-// Faint amber "tiger stripes" across the lower-right corner.
-ctx.setLineCap(.round)
-for (i, alpha) in [0.10, 0.07, 0.05].enumerated() {
-    let offset = CGFloat(i) * 70
-    ctx.setStrokeColor(rgb(0xF5A524, alpha))
-    ctx.setLineWidth(34)
-    ctx.move(to: CGPoint(x: 600 + offset, y: 80))
-    ctx.addLine(to: CGPoint(x: 960, y: 440 - offset))
-    ctx.strokePath()
-}
-
-// Top inner highlight.
-let highlight = CGGradient(
-    colorsSpace: space, colors: [rgb(0xFFFFFF, 0.10), rgb(0xFFFFFF, 0)] as CFArray, locations: [0, 1])!
-ctx.drawLinearGradient(highlight, start: CGPoint(x: 512, y: 924), end: CGPoint(x: 512, y: 700), options: [])
+ctx.drawLinearGradient(gradient([0xFBF8F2, 0xE6DFD2]), start: CGPoint(x: 512, y: 924), end: CGPoint(x: 512, y: 100), options: [])
+let highlight = CGGradient(colorsSpace: space, colors: [rgb(0xFFFFFF, 0.12), rgb(0xFFFFFF, 0)] as CFArray, locations: [0, 1])!
+ctx.drawLinearGradient(highlight, start: CGPoint(x: 512, y: 924), end: CGPoint(x: 512, y: 720), options: [])
 ctx.restoreGState()
 
-// Hairline border for definition on dark backgrounds.
 ctx.addPath(tilePath)
-ctx.setStrokeColor(rgb(0xFFFFFF, 0.08))
+ctx.setStrokeColor(rgb(0x000000, 0.10))
 ctx.setLineWidth(4)
 ctx.strokePath()
 
-// Magnifying glass.
-let lensCenter = CGPoint(x: 462, y: 566)
-let lensRadius: CGFloat = 232
-let ringWidth: CGFloat = 46
+// MARK: Ledger sheet
 
-// Lens glass: dark with a slight tint.
+let card = CGRect(x: 214, y: 250, width: 596, height: 560)
+let cardPath = CGPath(roundedRect: card, cornerWidth: 44, cornerHeight: 44, transform: nil)
+
 ctx.saveGState()
-ctx.addEllipse(in: CGRect(x: lensCenter.x - lensRadius, y: lensCenter.y - lensRadius, width: lensRadius * 2, height: lensRadius * 2))
-ctx.clip()
-let glass = CGGradient(
-    colorsSpace: space, colors: [rgb(0x2A303B), rgb(0x161920)] as CFArray, locations: [0, 1])!
-ctx.drawRadialGradient(
-    glass, startCenter: CGPoint(x: lensCenter.x - 60, y: lensCenter.y + 80), startRadius: 0,
-    endCenter: lensCenter, endRadius: lensRadius, options: [.drawsAfterEndLocation])
+ctx.setShadow(offset: CGSize(width: 0, height: -10), blur: 26, color: rgb(0x000000, 0.18))
+ctx.addPath(cardPath)
+ctx.setFillColor(rgb(0xFFFFFF))
+ctx.fillPath()
+ctx.restoreGState()
 
-// Ledger rows inside the lens: bullet + bar (debit orange, credit teal, neutral).
-let rows: [(y: CGFloat, width: CGFloat, bullet: UInt32, bar: UInt32)] = [
-    (lensCenter.y + 88, 210, 0xFF8A3D, 0xE9ECF1),
-    (lensCenter.y, 250, 0x2DD4BF, 0xE9ECF1),
-    (lensCenter.y - 88, 170, 0x9AA3B2, 0x9AA3B2),
-]
-for row in rows {
-    let bulletX = lensCenter.x - 150
-    ctx.setFillColor(rgb(row.bullet))
-    ctx.fillEllipse(in: CGRect(x: bulletX - 26, y: row.y - 26, width: 52, height: 52))
-    let bar = CGRect(x: bulletX + 52, y: row.y - 20, width: row.width, height: 40)
-    ctx.addPath(CGPath(roundedRect: bar, cornerWidth: 20, cornerHeight: 20, transform: nil))
-    ctx.setFillColor(rgb(row.bar, row.bar == 0x9AA3B2 ? 0.55 : 0.92))
-    ctx.fillPath()
+// Dark header band with a title bar.
+ctx.saveGState()
+ctx.addPath(cardPath)
+ctx.clip()
+ctx.setFillColor(rgb(0x252A33))
+ctx.fill(CGRect(x: card.minX, y: card.maxY - 110, width: card.width, height: 110))
+ctx.restoreGState()
+roundedBar(ctx, CGRect(x: card.minX + 48, y: card.maxY - 70, width: 170, height: 30), rgb(0xFFFFFF, 0.85))
+
+// Rows: alternating debit (orange) and credit (teal) markers with amount bars.
+let rowsY: [CGFloat] = [620, 520, 420, 320]
+let markers: [UInt32] = [0xFF8A3D, 0x2DD4BF, 0xFF8A3D, 0x2DD4BF]
+let widths: [CGFloat] = [250, 190, 280, 150]
+for (i, y) in rowsY.enumerated() {
+    if i > 0 {
+        ctx.setFillColor(rgb(0x000000, 0.06))
+        ctx.fill(CGRect(x: card.minX + 40, y: y + 48, width: card.width - 80, height: 4))
+    }
+    ctx.setFillColor(rgb(markers[i]))
+    ctx.fillEllipse(in: CGRect(x: card.minX + 52, y: y - 22, width: 44, height: 44))
+    roundedBar(ctx, CGRect(x: card.minX + 124, y: y - 17, width: widths[i], height: 34), rgb(0x3A404B, 0.75))
 }
 
-// Glass reflection.
-ctx.setFillColor(rgb(0xFFFFFF, 0.06))
-ctx.saveGState()
-ctx.translateBy(x: lensCenter.x - 120, y: lensCenter.y + 150)
-ctx.rotate(by: .pi / 5)
-ctx.fillEllipse(in: CGRect(x: -95, y: -38, width: 190, height: 76))
-ctx.restoreGState()
-ctx.restoreGState()
+// MARK: Magnifier
 
-// Handle: a single rounded amber stroke with a soft shadow, drawn under the ring.
-// The start is flat and sits on the ring's centerline so the ring (drawn next) hides the joint;
-// only the far end is rounded.
-let handleStart = CGPoint(
-    x: lensCenter.x + lensRadius * cos(-.pi / 4),
-    y: lensCenter.y + lensRadius * sin(-.pi / 4))
-let handleEnd = CGPoint(x: 800, y: 228)
-let handleWidth: CGFloat = 74
-let handle = CGMutablePath()
-handle.move(to: handleStart)
-handle.addLine(to: handleEnd)
+let lensCenter = CGPoint(x: 700, y: 360)
+let lensRadius: CGFloat = 118
+let ringWidth: CGFloat = 34
+let handleEnd = CGPoint(x: 850, y: 208)
+let handleWidth: CGFloat = 54
+
+// Handle: flat start on the ring's centerline (hidden by the ring), rounded tip.
+// Shaft and tip are filled separately inside one layer so they union and share a shadow.
+let dx = handleEnd.x - lensCenter.x, dy = handleEnd.y - lensCenter.y
+let length = sqrt(dx * dx + dy * dy)
+let handleStart = CGPoint(x: lensCenter.x + dx / length * lensRadius, y: lensCenter.y + dy / length * lensRadius)
+let shaft = CGMutablePath()
+shaft.move(to: handleStart)
+shaft.addLine(to: handleEnd)
 ctx.saveGState()
-ctx.setShadow(offset: CGSize(width: 0, height: -8), blur: 18, color: rgb(0x000000, 0.45))
-// Fill the shaft and the rounded tip separately inside one layer so they union
-// (a single combined path would cancel where they overlap) and share one shadow.
+ctx.setShadow(offset: CGSize(width: 0, height: -8), blur: 18, color: rgb(0x000000, 0.4))
 ctx.beginTransparencyLayer(auxiliaryInfo: nil)
 ctx.setFillColor(rgb(0xEE9A1F))
-ctx.addPath(handle.copy(strokingWithWidth: handleWidth, lineCap: .butt, lineJoin: .round, miterLimit: 10))
+ctx.addPath(shaft.copy(strokingWithWidth: handleWidth, lineCap: .butt, lineJoin: .round, miterLimit: 10))
 ctx.fillPath()
 ctx.fillEllipse(in: CGRect(x: handleEnd.x - handleWidth / 2, y: handleEnd.y - handleWidth / 2, width: handleWidth, height: handleWidth))
 ctx.endTransparencyLayer()
 ctx.restoreGState()
 
-// Lens ring: amber gradient stroke.
+// Ring: amber gradient stroke.
 ctx.saveGState()
-let ringRect = CGRect(x: lensCenter.x - lensRadius, y: lensCenter.y - lensRadius, width: lensRadius * 2, height: lensRadius * 2)
-ctx.setShadow(offset: CGSize(width: 0, height: -6), blur: 16, color: rgb(0x000000, 0.4))
-ctx.addEllipse(in: ringRect)
+ctx.setShadow(offset: CGSize(width: 0, height: -6), blur: 16, color: rgb(0x000000, 0.35))
+ctx.addEllipse(in: CGRect(x: lensCenter.x - lensRadius, y: lensCenter.y - lensRadius, width: lensRadius * 2, height: lensRadius * 2))
 ctx.setLineWidth(ringWidth)
 ctx.replacePathWithStrokedPath()
 ctx.clip()
-let ringGradient = CGGradient(
-    colorsSpace: space, colors: [rgb(0xFFC45C), rgb(0xF5A524), rgb(0xC9761A)] as CFArray, locations: [0, 0.5, 1])!
 ctx.drawLinearGradient(
-    ringGradient, start: CGPoint(x: lensCenter.x - lensRadius, y: lensCenter.y + lensRadius),
+    gradient([0xFFC45C, 0xF5A524, 0xC9761A], [0, 0.5, 1]),
+    start: CGPoint(x: lensCenter.x - lensRadius, y: lensCenter.y + lensRadius),
     end: CGPoint(x: lensCenter.x + lensRadius, y: lensCenter.y - lensRadius), options: [])
 ctx.restoreGState()
 
 guard let image = ctx.makeImage() else { fatalError("image") }
-let rep = NSBitmapImageRep(cgImage: image)
-try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: out))
+try! NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])!
+    .write(to: URL(fileURLWithPath: out))
 print("wrote \(out)")
