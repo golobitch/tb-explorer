@@ -9,6 +9,9 @@ struct TBExplorerApp: App {
             RootView()
                 .environment(model)
                 .frame(minWidth: 900, minHeight: 560)
+                #if DEBUG
+                .task { await model.applyDebugLaunchArguments() }
+                #endif
         }
         .defaultSize(width: 1280, height: 820)
         .windowToolbarStyle(.unified)

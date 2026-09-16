@@ -54,6 +54,16 @@ final class AppModel {
         path = []
     }
 
+    #if DEBUG
+    /// Used by `applyDebugLaunchArguments`; does not persist the connection.
+    func adoptDebugConnection(client: TBClient, info: ClusterInfo, connection: SavedConnection) {
+        disconnect()
+        self.client = client
+        self.info = info
+        self.connection = connection
+    }
+    #endif
+
     func disconnect() {
         client?.close()
         client = nil
