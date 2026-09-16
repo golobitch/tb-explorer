@@ -1,0 +1,5 @@
+module CTigerBeetle {
+    header "tb_client.h"
+    link "tb_client"
+    export *
+}
