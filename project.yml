@@ -33,3 +33,15 @@ targets:
       base:
         # Swift-only library; no Objective-C interface header to install.
         SWIFT_INSTALL_OBJC_HEADER: NO
+
+  TBKitTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests/TBKitTests
+    dependencies:
+      - target: TBKit
+    settings:
+      groups: [tigerbeetle]
+      base:
+        GENERATE_INFOPLIST_FILE: YES
