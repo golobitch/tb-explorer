@@ -3,7 +3,11 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --color-primary: #1d4ed8;
+  --color-primary: #f5a524;
+  --color-graphite: #252a33;
+  --color-debit: #ff8a3d;
+  --color-credit: #2dd4bf;
+  --color-body: rgb(var(--color-bg));
   --color-box-bg: rgb(var(--color-box));
   --color-box-shadow: rgb(var(--box-sd));
   --color-box-border: rgb(var(--box-border));
@@ -14,18 +18,18 @@
 }
 
 :root {
-  --color-bg: 255 255 255;
+  --color-bg: 250 247 240;
   --color-box: 255 255 255;
-  --box-border: 229 231 235;
-  --box-sd: 226 232 240 / 0.5;
-  --heading-1: 23 37 84;
-  --heading-2: 31 41 55;
-  --heading-3: 55 65 81;
+  --box-border: 231 225 212;
+  --box-sd: 226 220 205 / 0.5;
+  --heading-1: 37 42 51;
+  --heading-2: 45 51 61;
+  --heading-3: 82 89 102;
 }
 
 .dark {
-  --color-bg: 3 7 18;
-  --color-box: 17 24 39;
+  --color-bg: 21 24 30;
+  --color-box: 37 42 51;
   --box-border: 243 244 246 / 0.1;
   --box-sd: transparent;
   --heading-1: 255 255 255;
@@ -37,9 +41,18 @@ html {
   scroll-behavior: smooth;
 }
 
+section[id] {
+  scroll-margin-top: 6rem;
+}
+
 body {
   background-color: rgb(var(--color-bg));
   font-family: "Raleway", sans-serif;
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
 }
 
 [data-toggle-nav][data-open-nav="true"] #line1 {
@@ -59,5 +72,3 @@ body {
   visibility: visible;
   display: flex;
 }
-
-
