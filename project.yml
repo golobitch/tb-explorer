@@ -45,3 +45,25 @@ targets:
       groups: [tigerbeetle]
       base:
         GENERATE_INFOPLIST_FILE: YES
+
+  tb-seed:
+    type: tool
+    platform: macOS
+    sources:
+      - path: Tools/tb-seed
+    dependencies:
+      - target: TBKit
+    settings:
+      groups: [tigerbeetle]
+      base:
+        CODE_SIGN_IDENTITY: "-"
+
+schemes:
+  tb-seed:
+    build:
+      targets:
+        tb-seed: all
+    run:
+      config: Debug
+      commandLineArguments:
+        "--addresses 127.0.0.1:3000": true
