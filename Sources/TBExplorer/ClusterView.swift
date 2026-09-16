@@ -22,12 +22,24 @@ struct ClusterView: View {
                     }
             }
         }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button { model.isGoToPresented = true } label: {
+                    Label("Go to ID", systemImage: "number")
+                }
+                .help("Go to ID (⌘K)")
+            }
+        }
+        .sheet(isPresented: $model.isGoToPresented) {
+            GoToIDSheet()
+        }
     }
 
     @ViewBuilder
     private var detailRoot: some View {
         switch model.sidebar ?? .overview {
         case .overview: OverviewView()
+        case .search: SearchView()
         case .ledger(let l): LedgerView(ledger: l).id(l)
         }
     }
@@ -43,6 +55,8 @@ private struct Sidebar: View {
             Section(model.connection?.name ?? "Cluster") {
                 Label("Overview", systemImage: "gauge.with.dots.needle.33percent")
                     .tag(SidebarItem.overview)
+                Label("Search", systemImage: "magnifyingglass")
+                    .tag(SidebarItem.search)
             }
             Section("Ledgers") {
                 if model.ledgers.isEmpty {
@@ -97,5 +111,70 @@ private struct Sidebar: View {
         model.observe(ledger: l)
         model.select(.ledger(l))
         newLedger = ""
+    }
+}
+
+struct GoToIDSheet: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    @State private var input = ""
+    @State private var error: Error?
+    @State private var isLooking = false
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Go to ID").font(.headline)
+            HStack {
+                Image(systemName: "number").foregroundStyle(.secondary)
+                TextField("Account or transfer id", text: $input)
+                    .textFieldStyle(.plain)
+                    .font(.title3.monospaced())
+                    .focused($focused)
+                    .onSubmit(lookup)
+                if isLooking { ProgressView().controlSize(.small) }
+            }
+            .padding(10)
+            .background(.background, in: .rect(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.separator))
+            if let error {
+                Text(error.localizedDescription).font(.callout).foregroundStyle(.red)
+            } else {
+                Text("Decimal or 0x-hex. Detects whether the id is an account or a transfer.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+            HStack {
+                Spacer()
+                Button("Cancel", role: .cancel) { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Button("Go", action: lookup)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(UInt128(tbString: input) == nil || isLooking)
+            }
+        }
+        .padding(20)
+        .frame(width: 460)
+        .onAppear {
+            focused = true
+            if let s = NSPasteboard.general.string(forType: .string), UInt128(tbString: s) != nil, s.count < 60 {
+                input = s.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+    }
+
+    private func lookup() {
+        guard UInt128(tbString: input) != nil else { return }
+        isLooking = true
+        error = nil
+        Task {
+            do {
+                try await model.goTo(input)
+                dismiss()
+            } catch {
+                self.error = error
+            }
+            isLooking = false
+        }
     }
 }

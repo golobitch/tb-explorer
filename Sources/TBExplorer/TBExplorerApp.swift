@@ -23,8 +23,15 @@ struct GoCommands: Commands {
 
     var body: some Commands {
         CommandMenu("Go") {
+            Button("Go to ID…") { model.isGoToPresented = true }
+                .keyboardShortcut("k")
+                .disabled(!model.isConnected)
+            Divider()
             Button("Overview") { model.select(.overview) }
                 .keyboardShortcut("1")
+                .disabled(!model.isConnected)
+            Button("Search") { model.select(.search) }
+                .keyboardShortcut("f", modifiers: [.command, .shift])
                 .disabled(!model.isConnected)
             Divider()
             Button("Back") { model.goBack() }
