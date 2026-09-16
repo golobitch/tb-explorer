@@ -2,6 +2,8 @@
 
 A native macOS app for browsing [TigerBeetle](https://tigerbeetle.com) clusters: ledgers, accounts, transfers, balance history, and pending → post/void chains.
 
+**Website:** [golobitch.github.io/tb-explorer](https://golobitch.github.io/tb-explorer/)
+
 **Read-only.** The app never issues `create_accounts` or `create_transfers`, and CI enforces this.
 
 It's written in SwiftUI and talks to TigerBeetle through the official C client (`tb_client`), linked in as a static library. There's no bundled server or helper process. The app is macOS only and requires macOS 15.
@@ -102,6 +104,7 @@ Pushing a `v*` tag runs the release workflow, which publishes a zipped app and `
 ```
 project.yml                 XcodeGen spec (app, TBKit, tests, tb-seed)
 docs/images/                screenshots used by this README
+website/                    landing page (Astro), deployed to GitHub Pages by the pages workflow
 Vendor/tigerbeetle/         tb_client.h, module map, universal libtb_client.a, VERSION
 Sources/TBKit/              read-only Swift client over tb_client
   TBClient.swift            async submit, packet lifetimes, timeouts, errors
