@@ -13,6 +13,13 @@ struct ClusterView: View {
         } detail: {
             NavigationStack(path: $model.path) {
                 detailRoot
+                    .navigationDestination(for: Route.self) { route in
+                        switch route {
+                        case .ledger(let l): LedgerView(ledger: l)
+                        case .account(let id): AccountView(accountID: id)
+                        case .transfer(let id): TransferView(transferID: id)
+                        }
+                    }
             }
         }
     }
