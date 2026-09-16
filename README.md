@@ -14,7 +14,7 @@ The TigerBeetle client is compiled into the app and must be compatible with the 
 
 | TigerBeetle Explorer | tb_client | TigerBeetle server |
 | -------------------- | --------- | ------------------ |
-| 0.1.x                | 0.17.9    | 0.17.9             |
+| 0.0.x                | 0.17.9    | 0.17.9             |
 
 The TigerBeetle client protocol doesn't expose the server's release number. The app knows its own client version and reports a mismatch when the cluster evicts the client with *release too low* or *release too high*.
 
