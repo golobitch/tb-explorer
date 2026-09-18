@@ -17,12 +17,31 @@ env:
 
 jobs:
   test:
-    runs-on: macos-15
+    # Two Xcodes on purpose. macos-15 with Xcode 16.3 is the floor the app claims to support and
+    # the toolchain release.yml ships from; xcode-27 matches the machine the app is developed on.
+    # Foundation behaviour differs between them — deep link parsing already caught that — so a
+    # green local run should not be the only evidence.
+    name: test (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS 15 · Xcode 16.3
+            runner: macos-15
+            xcode: /Applications/Xcode_16.3.app
+          - name: macOS 27 · Xcode 27
+            runner: xcode-27
+            xcode: ""
     steps:
       - uses: actions/checkout@v4
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_16.3.app
+        if: matrix.xcode != ''
+        run: sudo xcode-select -s ${{ matrix.xcode }}
+
+      - name: Toolchain
+        run: xcodebuild -version
 
       - name: Read-only guard
         # The app and TBKit must never write to a cluster; only Tools/tb-seed may create.
@@ -50,7 +69,10 @@ jobs:
       - name: Unit and integration tests
         run: make integration TB_ADDR=$TB_ADDR
 
+      # One universal build is enough to prove the shipped configuration compiles; it runs on the
+      # image releases are cut from.
       - name: Release build (universal)
+        if: matrix.runner == 'macos-15'
         run: make release
 
       - name: Server log
