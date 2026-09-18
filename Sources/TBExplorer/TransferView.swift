@@ -51,6 +51,12 @@ struct TransferView: View {
         .navigationSubtitle(chain.map { subtitle(for: $0.transfer) } ?? "")
         .toolbar {
             ToolbarItemGroup {
+                if let chain {
+                    RouteButton(route: .transfer(chain.transfer.id), open: browser.copyLink) {
+                        Label("Copy Link", systemImage: "link")
+                    }
+                    .help("Copy a tb-explorer:// link to this transfer")
+                }
                 CurrencyFormatToggle(isOn: $currencyFormat)
                 Button { Task { await load() } } label: { Label("Reload", systemImage: "arrow.clockwise") }
                     .keyboardShortcut("r")

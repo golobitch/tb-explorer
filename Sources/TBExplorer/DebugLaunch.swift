@@ -18,6 +18,7 @@ import TBKit
 /// - `-TBConnectDelay <seconds>`: waits before connecting, leaving time to send a link to the
 ///   disconnected app and watch it be applied once the connection comes up
 /// - `-TBWindows <n>`: opens `n` windows onto the same connection
+/// - `-TBCopyLink <target>`: copies the link for e.g. `account:1015` and prints it as `LINK:<url>`
 /// - `-TBLink <url>`: delivers a `tb-explorer://` link as if it had been opened from outside,
 ///   and claims it here rather than waiting for the window to become key
 /// - `-TBSettings YES`: opens the Settings window (snapshots then capture it)
@@ -46,6 +47,10 @@ extension Session {
                 for _ in 0..<defaults.integer(forKey: "TBBack") { browser.goBack() }
                 for _ in 0..<defaults.integer(forKey: "TBForward") { browser.goForward() }
             }
+        }
+        if let target = defaults.string(forKey: "TBCopyLink"), let route = debugRoute(target) {
+            browser.copyLink(route)
+            print("LINK:" + (NSPasteboard.general.string(forType: .string) ?? "<empty>"))
         }
         if let link = defaults.string(forKey: "TBLink").flatMap(URL.init(string:)) {
             receive(link)
@@ -88,6 +93,17 @@ extension Session {
             observe(ledger: ledger)
         }
         adoptDebugMetadata(metadata)
+    }
+
+    private func debugRoute(_ target: String) -> Route? {
+        let parts = target.split(separator: ":", maxSplits: 1).map(String.init)
+        guard parts.count == 2 else { return nil }
+        switch parts[0] {
+        case "ledger": return UInt32(parts[1]).map { .ledger($0) }
+        case "account": return UInt128(tbString: parts[1]).map { .account($0) }
+        case "transfer": return UInt128(tbString: parts[1]).map { .transfer($0) }
+        default: return nil
+        }
     }
 
     private func debugOpen(_ target: String, in browser: Browser) {

@@ -86,6 +86,7 @@ private struct Sidebar: View {
                     .tag(SidebarItem.ledger(ledger))
                     .contextMenu {
                         Button("Copy Ledger ID") { copyToPasteboard(String(ledger)) }
+                        RouteButton("Copy Link", route: .ledger(ledger), open: browser.copyLink)
                         Button("Edit Format…") { openSettings() }
                     }
                 }

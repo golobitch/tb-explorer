@@ -19,6 +19,8 @@ struct IDText: View {
     let id: UInt128
     var route: Route? = nil
     var open: ((Route) -> Void)? = nil
+    /// Like `open`, a closure taking the route as an argument (pass `browser.copyLink`).
+    var copyLink: ((Route) -> Void)? = nil
 
     var body: some View {
         let text = Text(String(id)).font(.body.monospaced()).textSelection(.enabled)
@@ -34,6 +36,9 @@ struct IDText: View {
         .contextMenu {
             Button("Copy ID") { copyToPasteboard(String(self.id)) }
             Button("Copy as Hex") { copyToPasteboard(self.id.hexString) }
+            if let route, let copyLink, id != 0 {
+                RouteButton("Copy Link", route: route, open: copyLink)
+            }
             if let route, let open, id != 0 {
                 Divider()
                 RouteButton(route: route, open: open) { Text("Open") }

@@ -54,6 +54,12 @@ struct AccountView: View {
                 .fixedSize()
             }
             ToolbarItemGroup {
+                if let account {
+                    RouteButton(route: .account(account.id), open: browser.copyLink) {
+                        Label("Copy Link", systemImage: "link")
+                    }
+                    .help("Copy a tb-explorer:// link to this account")
+                }
                 CurrencyFormatToggle(isOn: $currencyFormat)
                 Button { Task { await load() } } label: { Label("Reload", systemImage: "arrow.clockwise") }
                     .keyboardShortcut("r")

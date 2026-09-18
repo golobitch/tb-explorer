@@ -45,6 +45,7 @@ struct AccountsTable: View {
             .contextMenu(forSelectionType: UInt128.self) { ids in
                 if ids.count == 1, let id = ids.first {
                     RouteButton("Open Account", route: .account(id), open: browser.open)
+                    RouteButton("Copy Link", route: .account(id), open: browser.copyLink)
                     Divider()
                 }
                 Button(ids.count == 1 ? "Copy ID" : "Copy \(ids.count) IDs") {
@@ -92,11 +93,15 @@ struct TransfersTable: View {
                 }
                 .width(min: 50, ideal: 90)
                 TableColumn("Debit Account") { t in
-                    IDText(id: t.debitAccountID, route: .account(t.debitAccountID), open: browser.open)
+                    IDText(
+                        id: t.debitAccountID, route: .account(t.debitAccountID),
+                        open: browser.open, copyLink: browser.copyLink)
                 }
                 .width(min: 80, ideal: 130)
                 TableColumn("Credit Account") { t in
-                    IDText(id: t.creditAccountID, route: .account(t.creditAccountID), open: browser.open)
+                    IDText(
+                        id: t.creditAccountID, route: .account(t.creditAccountID),
+                        open: browser.open, copyLink: browser.copyLink)
                 }
                 .width(min: 80, ideal: 130)
                 TableColumn("Amount") { t in
@@ -113,6 +118,7 @@ struct TransfersTable: View {
             .contextMenu(forSelectionType: UInt128.self) { ids in
                 if ids.count == 1, let id = ids.first, let t = list.items.first(where: { $0.id == id }) {
                     RouteButton("Open Transfer", route: .transfer(id), open: browser.open)
+                    RouteButton("Copy Link", route: .transfer(id), open: browser.copyLink)
                     RouteButton("Open Debit Account", route: .account(t.debitAccountID), open: browser.open)
                     RouteButton("Open Credit Account", route: .account(t.creditAccountID), open: browser.open)
                     if t.pendingID != 0 {

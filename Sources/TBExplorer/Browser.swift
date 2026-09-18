@@ -92,6 +92,20 @@ final class Browser {
         reset()
     }
 
+    /// Writes a shareable link to this route on the pasteboard, stamped with the cluster so the
+    /// other end cannot silently resolve a different object with the same id.
+    func copyLink(_ route: Route) {
+        copyToPasteboard(link(route).url(cluster: session.info?.clusterID).absoluteString)
+    }
+
+    private func link(_ route: Route) -> DeepLink {
+        switch route {
+        case .ledger(let l): .ledger(l)
+        case .account(let id): .account(id)
+        case .transfer(let id): .transfer(id)
+        }
+    }
+
     /// Navigates to the place a link names.
     func apply(_ link: DeepLink) {
         switch link {
