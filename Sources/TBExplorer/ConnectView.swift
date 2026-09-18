@@ -61,7 +61,8 @@ struct ConnectView: View {
                     .frame(maxWidth: .infinity)
             }
             .controlSize(.large)
-            .keyboardShortcut("n")
+            // ⌘N belongs to File ▸ New Window now that the app has a window group.
+            .keyboardShortcut("n", modifiers: [.command, .shift])
         }
         .padding(24)
     }

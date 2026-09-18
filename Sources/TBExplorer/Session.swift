@@ -31,6 +31,11 @@ final class Session {
 
     var metadataError: String?
 
+    #if DEBUG
+    /// `applyDebugLaunchArguments` runs from a window's task, and there can be several windows.
+    var debugArgumentsApplied = false
+    #endif
+
     var isConnected: Bool { client != nil }
 
     func connect(_ saved: SavedConnection) async throws {

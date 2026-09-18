@@ -15,11 +15,16 @@ import TBKit
 /// - `-TBSearch <id>` / `-TBFilterCode <code>`: prefill the account Transfers tab search or code filter
 /// - `-TBCurrency on|off`: sets the currency-format checkbox
 /// - `-TBFormat "840:2:USD,700:2:EUR"`: ledger overrides for the debug connection, `id:decimals:name`
+/// - `-TBWindows <n>`: opens `n` windows onto the same connection
 /// - `-TBSettings YES`: opens the Settings window (snapshots then capture it)
 /// - `-TBSnapshot <name>`: after loading, draw the main window to `<name>.png` in the
 ///   app's temporary directory and quit. Needs no Screen Recording permission.
 extension Session {
-    func applyDebugLaunchArguments(_ browser: Browser) async {
+    /// Returns true for the window that applied the arguments; later windows get false.
+    @discardableResult
+    func applyDebugLaunchArguments(_ browser: Browser) async -> Bool {
+        guard !debugArgumentsApplied else { return false }
+        debugArgumentsApplied = true
         let defaults = UserDefaults.standard
         if let tab = defaults.string(forKey: "TBTab") {
             defaults.set(tab, forKey: "account.tab")
@@ -36,11 +41,16 @@ extension Session {
                 for _ in 0..<defaults.integer(forKey: "TBForward") { browser.goForward() }
             }
         }
-        if let snapshot = defaults.string(forKey: "TBSnapshot") {
-            try? await Task.sleep(for: .seconds(4))
-            debugSnapshot(named: snapshot)
-            NSApp.terminate(nil)
-        }
+        return true
+    }
+
+    /// Kept apart from `applyDebugLaunchArguments` because it ends the process: anything else the
+    /// caller wants to set up, such as extra windows, has to happen first.
+    func applyDebugSnapshot() async {
+        guard let snapshot = UserDefaults.standard.string(forKey: "TBSnapshot") else { return }
+        try? await Task.sleep(for: .seconds(4))
+        debugSnapshot(named: snapshot)
+        NSApp.terminate(nil)
     }
 
     private func debugConnect(address: String) async {
@@ -85,6 +95,7 @@ extension Session {
 
     private func debugSnapshot(named name: String) {
         let candidates = NSApp.windows.filter { $0.isVisible && $0.contentView != nil }
+        print("snapshot: windows " + candidates.map(\.title).joined(separator: " | "))
         // With `-TBSettings`, capture the Settings window rather than the main one. SwiftUI gives
         // it a known identifier; its title is the selected pane, so the title is no help.
         let wanted = UserDefaults.standard.bool(forKey: "TBSettings")
@@ -112,8 +123,20 @@ extension Session {
         }
         // The app is sandboxed and newer macOS blocks reading another app's container, so
         // `-TBSnapshotStdout` streams the image out instead: pipe it through `base64 -d`.
+        // `SNAPSHOT:` is the chosen window; `SNAPSHOT<i>:` is every window, so a multi-window
+        // run can be checked one window at a time.
         if UserDefaults.standard.bool(forKey: "TBSnapshotStdout") {
             print("SNAPSHOT:" + png.base64EncodedString())
+            guard candidates.count > 1 else { return }
+            for (i, other) in candidates.enumerated() {
+                guard let view = other.contentView?.superview,
+                      let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds)
+                else { continue }
+                view.cacheDisplay(in: view.bounds, to: rep)
+                if let data = rep.representation(using: .png, properties: [:]) {
+                    print("SNAPSHOT\(i):" + data.base64EncodedString())
+                }
+            }
         }
     }
 }
