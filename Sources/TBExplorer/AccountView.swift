@@ -154,6 +154,7 @@ private struct AccountTransfersTab: View {
     /// miscompiled and corrupted the account id.
     @State private var searchRequest: SearchRequest?
     @State private var searchSerial = 0
+    @State private var filterFocus = FilterFocus()
 
     private struct SearchRequest: Hashable {
         let id: UInt128
@@ -194,7 +195,7 @@ private struct AccountTransfersTab: View {
             .padding(.top, 8)
             .disabled(pinned != nil)
 
-            FilterBar(fields: $fields, onApply: applyFilters)
+            FilterBar(fields: $fields, focus: filterFocus, onApply: applyFilters)
                 .disabled(pinned != nil)
             if let filterError {
                 ErrorBanner(error: filterError).padding(.horizontal, 12).padding(.bottom, 8)
@@ -206,6 +207,7 @@ private struct AccountTransfersTab: View {
             Divider()
             TransfersTable(list: list, perspective: account.id, emptyText: emptyText, style: style)
         }
+        .focusedSceneValue(filterFocus)
         .searchable(text: $searchText, placement: .toolbar, prompt: "Find Transfer by ID")
         .onSubmit(of: .search, runSearch)
         .onChange(of: searchText) { _, new in

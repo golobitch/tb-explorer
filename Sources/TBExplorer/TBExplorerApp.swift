@@ -82,6 +82,8 @@ struct GoCommands: Commands {
     /// The focused window's browser, or nil while Settings is frontmost or no window is open —
     /// which is exactly when the navigation items should be greyed out.
     @FocusedValue(Browser.self) private var browser
+    /// The frontmost screen's filter row, when it has one.
+    @FocusedValue(FilterFocus.self) private var filterFocus
     @Environment(\.openWindow) private var openWindow
 
     var body: some Commands {
@@ -106,6 +108,10 @@ struct GoCommands: Commands {
             Button("Search") { browser?.select(.search) }
                 .keyboardShortcut("f", modifiers: [.command, .shift])
                 .disabled(browser == nil || !session.isConnected)
+            // ⌘F narrows what is on screen; going to an id by hand is ⌘K.
+            Button("Filter…") { filterFocus?.request() }
+                .keyboardShortcut("f")
+                .disabled(filterFocus == nil)
             Divider()
             Button("Back") { browser?.goBack() }
                 .keyboardShortcut("[")

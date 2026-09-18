@@ -46,20 +46,25 @@ struct FilterFields: Equatable {
 }
 
 struct FilterBar: View {
+    enum Field: Hashable { case ledger, code, userData128, userData64, userData32 }
+
     @Binding var fields: FilterFields
     /// Shown on cluster-wide lists; ledger screens and account tabs already scope it.
     var showsLedger = false
+    /// The screen's ⌘F target. Screens that don't publish one simply never take focus.
+    var focus: FilterFocus? = nil
     let onApply: () -> Void
+    @FocusState private var focused: Field?
 
     var body: some View {
         HStack(spacing: 8) {
             if showsLedger {
-                field("Ledger", $fields.ledger, width: 90, digits: true)
+                field("Ledger", .ledger, $fields.ledger, width: 90, digits: true)
             }
-            field("Code", $fields.code, width: 70, digits: true)
-            field("user_data_128", $fields.userData128, width: 200)
-            field("user_data_64", $fields.userData64, width: 150)
-            field("user_data_32", $fields.userData32, width: 100, digits: true)
+            field("Code", .code, $fields.code, width: 70, digits: true)
+            field("user_data_128", .userData128, $fields.userData128, width: 200)
+            field("user_data_64", .userData64, $fields.userData64, width: 150)
+            field("user_data_32", .userData32, $fields.userData32, width: 100, digits: true)
             Button("Apply", action: onApply)
             if fields != FilterFields() {
                 Button("Clear") {
@@ -73,13 +78,25 @@ struct FilterBar: View {
         .controlSize(.small)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+        .onChange(of: focus?.token) { focused = showsLedger ? .ledger : .code }
+        #if DEBUG
+        // `-TBFilterFocus YES` drives the same request ⌘F sends, for screenshots.
+        .task {
+            guard UserDefaults.standard.bool(forKey: "TBFilterFocus") else { return }
+            try? await Task.sleep(for: .seconds(2))
+            focus?.request()
+        }
+        #endif
     }
 
-    private func field(_ title: String, _ text: Binding<String>, width: CGFloat, digits: Bool = false) -> some View {
+    private func field(
+        _ title: String, _ id: Field, _ text: Binding<String>, width: CGFloat, digits: Bool = false
+    ) -> some View {
         TextField(title, text: text)
             .textFieldStyle(.roundedBorder)
             .font(.callout.monospaced())
             .frame(width: width)
+            .focused($focused, equals: id)
             .onSubmit(onApply)
             .modifier(DigitsModifier(enabled: digits, text: text))
     }
@@ -103,10 +120,11 @@ struct LedgerView: View {
     @AppStorage("ledger.newestFirst") private var newestFirst = false
     @AppStorage("format.currency") private var currencyFormat = true
     @State private var list = PagedList<Account>()
+    @State private var filterFocus = FilterFocus()
 
     var body: some View {
         VStack(spacing: 0) {
-            FilterBar(fields: $fields, onApply: apply)
+            FilterBar(fields: $fields, focus: filterFocus, onApply: apply)
             if let filterError {
                 ErrorBanner(error: filterError).padding(.horizontal, 12).padding(.bottom, 8)
             }
@@ -115,6 +133,7 @@ struct LedgerView: View {
                 list: list, emptyText: "No Accounts in Ledger \(ledger)",
                 style: session.amountStyle(currency: currencyFormat))
         }
+        .focusedSceneValue(filterFocus)
         .navigationTitle(session.amountStyle(currency: currencyFormat).ledgerLabel(ledger))
         .navigationSubtitle("query_accounts")
         .toolbar {

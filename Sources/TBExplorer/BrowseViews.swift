@@ -12,10 +12,11 @@ struct AllAccountsView: View {
     @AppStorage("format.currency") private var currencyFormat = true
     @State private var list = PagedList<Account>()
     @State private var lookup = IDLookup()
+    @State private var filterFocus = FilterFocus()
 
     var body: some View {
         VStack(spacing: 0) {
-            FilterBar(fields: $fields, showsLedger: true, onApply: apply)
+            FilterBar(fields: $fields, showsLedger: true, focus: filterFocus, onApply: apply)
             if let filterError {
                 ErrorBanner(error: filterError).padding(.horizontal, 12).padding(.bottom, 8)
             }
@@ -29,6 +30,7 @@ struct AllAccountsView: View {
                 emptyText: applied == FilterFields.Parsed() ? "No Accounts" : "No Accounts Match These Filters",
                 style: session.amountStyle(currency: currencyFormat))
         }
+        .focusedSceneValue(filterFocus)
         .navigationTitle("Accounts")
         .navigationSubtitle("query_accounts")
         .toolbar { BrowseToolbar(newestFirst: $newestFirst, currencyFormat: $currencyFormat) { Task { await list.reload() } } }
@@ -80,10 +82,11 @@ struct AllTransfersView: View {
     @AppStorage("format.currency") private var currencyFormat = true
     @State private var list = PagedList<Transfer>()
     @State private var lookup = IDLookup()
+    @State private var filterFocus = FilterFocus()
 
     var body: some View {
         VStack(spacing: 0) {
-            FilterBar(fields: $fields, showsLedger: true, onApply: apply)
+            FilterBar(fields: $fields, showsLedger: true, focus: filterFocus, onApply: apply)
             if let filterError {
                 ErrorBanner(error: filterError).padding(.horizontal, 12).padding(.bottom, 8)
             }
@@ -97,6 +100,7 @@ struct AllTransfersView: View {
                 emptyText: applied == FilterFields.Parsed() ? "No Transfers" : "No Transfers Match These Filters",
                 style: session.amountStyle(currency: currencyFormat))
         }
+        .focusedSceneValue(filterFocus)
         .navigationTitle("Transfers")
         .navigationSubtitle("query_transfers")
         .toolbar { BrowseToolbar(newestFirst: $newestFirst, currencyFormat: $currencyFormat) { Task { await list.reload() } } }
