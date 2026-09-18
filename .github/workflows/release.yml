@@ -83,7 +83,7 @@ jobs:
 
           # Sign with hardened runtime and a secure timestamp (both required for notarization).
           codesign --force --deep --options runtime --timestamp \
-            --entitlements Sources/TBExplorer/TBExplorer.entitlements \
+            --entitlements ui/Sources/TBExplorer/TBExplorer.entitlements \
             --keychain "$KEYCHAIN" --sign "$MACOS_SIGN_IDENTITY" "$APP"
           codesign --verify --deep --strict --verbose=2 "$APP"
 

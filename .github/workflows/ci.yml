@@ -44,10 +44,10 @@ jobs:
         run: xcodebuild -version
 
       - name: Read-only guard
-        # The app and TBKit must never write to a cluster; only Tools/tb-seed may create.
+        # No front end may write to a cluster; only ui/Tools/tb-seed may create.
         run: |
-          if grep -rnE 'CREATE_(ACCOUNTS|TRANSFERS)|create_accounts|create_transfers' Sources; then
-            echo "create operations are not allowed in Sources/" >&2
+          if grep -rnE 'CREATE_(ACCOUNTS|TRANSFERS)|create_accounts|create_transfers' ui/Sources cli; then
+            echo "create operations are not allowed in ui/Sources or cli/" >&2
             exit 1
           fi
 

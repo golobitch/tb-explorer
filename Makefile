@@ -3,11 +3,12 @@ TB_BIN       := .bin/tigerbeetle
 TB_DATA      ?= .tigerbeetle/0_0.tigerbeetle
 TB_ADDR      ?= 127.0.0.1:3000
 DERIVED      := build/DerivedData
-XCB          := xcodebuild -project TBExplorer.xcodeproj -derivedDataPath $(DERIVED)
+XCB          := xcodebuild -project ui/TBExplorer.xcodeproj -derivedDataPath $(DERIVED)
 
-.PHONY: icon generate open build release test integration seed tb tb-format tb-start tb-up tb-stop tb-reset vendor clean
+.PHONY: icon generate open build release test integration seed tb tb-format tb-start tb-up tb-stop tb-reset vendor clean \
+        cli-build cli-run cli-test
 
-ICONSET := Sources/TBExplorer/Assets.xcassets/AppIcon.appiconset
+ICONSET := ui/Sources/TBExplorer/Assets.xcassets/AppIcon.appiconset
 
 # Render the app icon at 1024px and derive every size the asset catalog needs.
 icon:
@@ -15,10 +16,10 @@ icon:
 	for s in 16 32 64 128 256 512; do sips -z $$s $$s $(ICONSET)/icon_1024.png --out $(ICONSET)/icon_$$s.png >/dev/null; done
 
 generate:
-	xcodegen generate --quiet
+	xcodegen generate --quiet --spec ui/project.yml --project ui
 
 open: generate
-	open TBExplorer.xcodeproj
+	open ui/TBExplorer.xcodeproj
 
 build: generate
 	$(XCB) -scheme TBExplorer -configuration Debug build | xcbeautify 2>/dev/null || $(XCB) -scheme TBExplorer -configuration Debug build -quiet
@@ -40,6 +41,16 @@ integration: test
 seed: generate
 	$(XCB) -scheme tb-seed -configuration Debug build -quiet
 	$(DERIVED)/Build/Products/Debug/tb-seed --addresses $(TB_ADDR)
+
+# The terminal front end. Cargo handles its own incremental builds, so these just forward.
+cli-build:
+	cd cli && cargo build
+
+cli-run: cli-build
+	cd cli && cargo run -- --addresses $(TB_ADDR)
+
+cli-test:
+	cd cli && TB_ADDRESS=$(TB_ADDR) cargo test
 
 $(TB_BIN):
 	mkdir -p .bin
@@ -88,4 +99,4 @@ vendor:
 	rm -rf .bin/tbgo
 
 clean:
-	rm -rf build TBExplorer.xcodeproj
+	rm -rf build ui/TBExplorer.xcodeproj cli/target

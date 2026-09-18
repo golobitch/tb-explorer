@@ -61,8 +61,10 @@ struct FormatTests {
     }
 
     @Test func vendoredVersionMatches() throws {
+        // ui/Tests/TBKitTests/FormatTests.swift → the repo root, where Vendor is shared with cli.
         let versionFile = URL(filePath: #filePath)
-            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
             .appending(path: "Vendor/tigerbeetle/VERSION")
         let vendored = try String(contentsOf: versionFile, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)
         #expect(vendored == TBClient.clientVersion)
