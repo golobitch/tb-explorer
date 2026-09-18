@@ -18,6 +18,11 @@ struct TBExplorerApp: App {
         .commands {
             GoCommands(model: model)
         }
+
+        Settings {
+            SettingsView()
+                .environment(model)
+        }
     }
 }
 
@@ -56,12 +61,26 @@ struct GoCommands: Commands {
 
 struct RootView: View {
     @Environment(AppModel.self) private var model
+    #if DEBUG
+    @Environment(\.openSettings) private var openSettings
+    #endif
 
     var body: some View {
-        if model.isConnected {
-            ClusterView()
-        } else {
-            ConnectView()
+        Group {
+            if model.isConnected {
+                ClusterView()
+            } else {
+                ConnectView()
+            }
         }
+        #if DEBUG
+        // `-TBSettings YES` opens the Settings window for screenshots; `openSettings` only
+        // exists in a view, so the debug launch path cannot do it itself.
+        .task {
+            guard UserDefaults.standard.bool(forKey: "TBSettings") else { return }
+            try? await Task.sleep(for: .seconds(3))
+            openSettings()
+        }
+        #endif
     }
 }
