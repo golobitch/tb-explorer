@@ -1,0 +1,14 @@
+[package]
+name = "tbclient"
+description = "Read-only client for TigerBeetle, over the vendored tb_client"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[lints.clippy]
+undocumented_unsafe_blocks = "warn"
