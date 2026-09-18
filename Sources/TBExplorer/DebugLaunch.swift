@@ -7,7 +7,10 @@ import TBKit
 ///
 ///     open "TigerBeetle Explorer.app" --args -TBConnect 127.0.0.1:3001 -TBOpen transfer:100011
 ///
-/// - `-TBOpen`: `overview`, `search`, `accounts`, `transfers`, `ledger:<id>`, `account:<id>` or `transfer:<id>`
+/// - `-TBOpen`: `overview`, `search`, `accounts`, `transfers`, `ledger:<id>`, `account:<id>` or
+///   `transfer:<id>`; several separated by commas are opened in order, building a stack
+/// - `-TBBack <n>` / `-TBForward <n>`: navigate the history after opening, so a snapshot can show
+///   where Back and Forward land
 /// - `-TBTab`: account tab (`Transfers`, `Balance History`, `Raw`)
 /// - `-TBSearch <id>` / `-TBFilterCode <code>`: prefill the account Transfers tab search or code filter
 /// - `-TBCurrency on|off`: sets the currency-format checkbox
@@ -28,7 +31,9 @@ extension AppModel {
             await debugConnect(address: address)
             applyDebugFormats()
             if isConnected, let target = defaults.string(forKey: "TBOpen") {
-                debugOpen(target)
+                for step in target.split(separator: ",") { debugOpen(String(step)) }
+                for _ in 0..<defaults.integer(forKey: "TBBack") { goBack() }
+                for _ in 0..<defaults.integer(forKey: "TBForward") { goForward() }
             }
         }
         if let snapshot = defaults.string(forKey: "TBSnapshot") {

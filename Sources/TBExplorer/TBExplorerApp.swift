@@ -50,7 +50,10 @@ struct GoCommands: Commands {
             Divider()
             Button("Back") { model.goBack() }
                 .keyboardShortcut("[")
-                .disabled(model.path.isEmpty)
+                .disabled(!model.canGoBack)
+            Button("Forward") { model.goForward() }
+                .keyboardShortcut("]")
+                .disabled(!model.canGoForward)
             Divider()
             Button("Disconnect") { model.disconnect() }
                 .keyboardShortcut("w", modifiers: [.command, .shift])

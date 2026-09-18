@@ -33,10 +33,24 @@ final class AppModel {
     private(set) var ledgers: [UInt32] = []
 
     var sidebar: SidebarItem? = .overview {
-        didSet { if oldValue != sidebar { path = [] } }
+        didSet { if oldValue != sidebar { history.reset() } }
     }
-    var path: [Route] = []
+    private var history = NavigationHistory<Route>()
     var isGoToPresented = false
+
+    /// Bound to the `NavigationStack`, which also writes it directly — `adopt` reconciles that
+    /// write so a route popped by its back button still becomes a forward entry. The guard is
+    /// load-bearing: `@Observable` reports a mutation for any `mutating` call, even an inert one.
+    var path: [Route] {
+        get { history.stack }
+        set {
+            guard newValue != history.stack else { return }
+            history.adopt(newValue)
+        }
+    }
+
+    var canGoBack: Bool { history.canGoBack }
+    var canGoForward: Bool { history.canGoForward }
 
     var isConnected: Bool { client != nil }
 
@@ -54,7 +68,7 @@ final class AppModel {
         self.connection = used
         clusterMetadata = metadataStore.metadata(for: used.id)
         sidebar = .overview
-        path = []
+        history.reset()
     }
 
     #if DEBUG
@@ -80,7 +94,7 @@ final class AppModel {
         connection = nil
         clusterMetadata = ClusterMetadata()
         ledgers = []
-        path = []
+        history.reset()
         sidebar = .overview
     }
 
@@ -110,16 +124,21 @@ final class AppModel {
 
     func select(_ item: SidebarItem) {
         sidebar = item
-        path = []
+        history.reset()
     }
 
     func open(_ route: Route) {
         if case .ledger(let l) = route { observe(ledger: l) }
-        path.append(route)
+        history.push(route)
     }
 
     func goBack() {
-        if !path.isEmpty { path.removeLast() }
+        history.back()
+    }
+
+    func goForward() {
+        history.forwardOne()
+        if case .ledger(let l)? = history.stack.last { observe(ledger: l) }
     }
 
     /// Resolves an id to an account or transfer and navigates to it.
