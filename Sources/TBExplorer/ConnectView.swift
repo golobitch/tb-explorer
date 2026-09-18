@@ -2,14 +2,14 @@ import SwiftUI
 import TBKit
 
 struct ConnectView: View {
-    @Environment(AppModel.self) private var model
+    @Environment(Session.self) private var session
     @State private var selection: SavedConnection.ID?
     @State private var editing: SavedConnection?
     @State private var connecting: SavedConnection.ID?
     @State private var errors: [SavedConnection.ID: Error] = [:]
     @State private var pendingDelete: SavedConnection?
 
-    private var store: ConnectionStore { model.store }
+    private var store: ConnectionStore { session.store }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -150,7 +150,7 @@ struct ConnectView: View {
         errors[conn.id] = nil
         Task {
             do {
-                try await model.connect(conn)
+                try await session.connect(conn)
             } catch {
                 errors[conn.id] = error
             }

@@ -12,18 +12,18 @@ struct SettingsView: View {
 /// Overrides are stored per connection, so this pane needs a live connection to edit anything.
 private struct FormatsSettings: View {
     // Rendered directly by `SettingsView`; a `TabView` returns when a second pane exists.
-    @Environment(AppModel.self) private var model
+    @Environment(Session.self) private var session
     @AppStorage("format.currency") private var currencyFormat = true
 
     /// The amount previewed beside each ledger: 123456 reads as 1,234.56 at exponent 2.
     private static let sample: UInt128 = 123_456
 
-    private var style: AmountStyle { model.amountStyle(currency: currencyFormat) }
+    private var style: AmountStyle { session.amountStyle(currency: currencyFormat) }
 
     /// Ledgers seen while browsing, plus any that already carry an override.
     private var ledgers: [UInt32] {
-        let overridden = model.clusterMetadata.ledgers.keys.compactMap(UInt32.init)
-        return Array(Set(model.ledgers + overridden)).sorted()
+        let overridden = session.clusterMetadata.ledgers.keys.compactMap(UInt32.init)
+        return Array(Set(session.ledgers + overridden)).sorted()
     }
 
     var body: some View {
@@ -41,7 +41,7 @@ private struct FormatsSettings: View {
             }
 
             Section("Ledgers") {
-                if model.connection == nil {
+                if session.connection == nil {
                     Text("Connect to a cluster to set per-ledger formats.").foregroundStyle(.secondary)
                 } else if ledgers.isEmpty {
                     Text("Ledgers appear here as you browse.").foregroundStyle(.secondary)
@@ -66,7 +66,7 @@ private struct FormatsSettings: View {
             CodeLabels(kind: .transfer)
             CodeLabels(kind: .account)
 
-            if let error = model.metadataError {
+            if let error = session.metadataError {
                 Section { Text(error).foregroundStyle(.red) }
             }
         }
@@ -74,7 +74,7 @@ private struct FormatsSettings: View {
     }
 
     private func source(of ledger: UInt32) -> String {
-        if model.clusterMetadata[ledger: ledger] != nil { return "Custom" }
+        if session.clusterMetadata[ledger: ledger] != nil { return "Custom" }
         guard let currency = ISO4217.currency(forLedger: ledger) else { return "No ISO 4217 match" }
         return currencyFormat ? "ISO 4217 · \(currency.alpha)" : "ISO 4217 · \(currency.alpha) (off)"
     }
@@ -84,14 +84,14 @@ private struct FormatsSettings: View {
 /// or exact integers, takes over again.
 private struct LedgerFormatEditor: View {
     let ledger: UInt32
-    @Environment(AppModel.self) private var model
+    @Environment(Session.self) private var session
     @State private var name = ""
     @State private var symbol = ""
     @State private var exponent = ""
 
     private var detected: ISOCurrency? { ISO4217.currency(forLedger: ledger) }
 
-    private var isOverridden: Bool { model.clusterMetadata[ledger: ledger] != nil }
+    private var isOverridden: Bool { session.clusterMetadata[ledger: ledger] != nil }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -144,18 +144,18 @@ private struct LedgerFormatEditor: View {
     }
 
     private func load() {
-        let current = model.clusterMetadata[ledger: ledger]
+        let current = session.clusterMetadata[ledger: ledger]
         name = current?.name ?? ""
         symbol = current?.symbol ?? ""
         exponent = current.map { String($0.exponent) } ?? ""
     }
 
     private func apply() {
-        var metadata = model.clusterMetadata
+        var metadata = session.clusterMetadata
         metadata[ledger: ledger] = draft
         if draft == nil { metadata.ledgers.removeValue(forKey: String(ledger)) }
-        guard metadata != model.clusterMetadata else { return }
-        model.updateMetadata(metadata)
+        guard metadata != session.clusterMetadata else { return }
+        session.updateMetadata(metadata)
     }
 
     private func remove() {
@@ -176,12 +176,12 @@ private struct CodeLabels: View {
     }
 
     let kind: Kind
-    @Environment(AppModel.self) private var model
+    @Environment(Session.self) private var session
     @State private var newCode = ""
     @State private var newName = ""
 
     private var labels: [(code: UInt16, name: String)] {
-        let source = kind == .transfer ? model.clusterMetadata.transferCodes : model.clusterMetadata.accountCodes
+        let source = kind == .transfer ? session.clusterMetadata.transferCodes : session.clusterMetadata.accountCodes
         return source.compactMap { key, value in UInt16(key).map { ($0, value) } }.sorted { $0.code < $1.code }
     }
 
@@ -209,27 +209,27 @@ private struct CodeLabels: View {
             .textFieldStyle(.roundedBorder)
             .labelsHidden()
         }
-        .disabled(model.connection == nil)
+        .disabled(session.connection == nil)
     }
 
     private func add() {
         guard let code = UInt16(newCode), !newName.isEmpty else { return }
-        var metadata = model.clusterMetadata
+        var metadata = session.clusterMetadata
         switch kind {
         case .transfer: metadata.transferCodes[String(code)] = newName
         case .account: metadata.accountCodes[String(code)] = newName
         }
-        model.updateMetadata(metadata)
+        session.updateMetadata(metadata)
         newCode = ""
         newName = ""
     }
 
     private func remove(_ code: UInt16) {
-        var metadata = model.clusterMetadata
+        var metadata = session.clusterMetadata
         switch kind {
         case .transfer: metadata.transferCodes.removeValue(forKey: String(code))
         case .account: metadata.accountCodes.removeValue(forKey: String(code))
         }
-        model.updateMetadata(metadata)
+        session.updateMetadata(metadata)
     }
 }

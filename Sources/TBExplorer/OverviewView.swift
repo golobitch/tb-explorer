@@ -2,7 +2,8 @@ import SwiftUI
 import TBKit
 
 struct OverviewView: View {
-    @Environment(AppModel.self) private var model
+    @Environment(Session.self) private var session
+    @Environment(Browser.self) private var browser
     @State private var isPinging = false
     @State private var pingError: Error?
     @State private var sampleError: Error?
@@ -10,7 +11,7 @@ struct OverviewView: View {
 
     var body: some View {
         Form {
-            if let info = model.info {
+            if let info = session.info {
                 Section("Cluster") {
                     LabeledContent("Cluster ID") {
                         HStack {
@@ -47,12 +48,12 @@ struct OverviewView: View {
             }
 
             Section {
-                if model.ledgers.isEmpty {
+                if session.ledgers.isEmpty {
                     Text("No ledgers discovered yet.").foregroundStyle(.secondary)
                 } else {
-                    ForEach(model.ledgers, id: \.self) { ledger in
+                    ForEach(session.ledgers, id: \.self) { ledger in
                         Button {
-                            model.select(.ledger(ledger))
+                            browser.select(.ledger(ledger))
                         } label: {
                             LabeledContent {
                                 Image(systemName: "chevron.right").foregroundStyle(.tertiary)
@@ -79,7 +80,7 @@ struct OverviewView: View {
         }
         .formStyle(.grouped)
         .navigationTitle("Overview")
-        .navigationSubtitle(model.connection?.name ?? "")
+        .navigationSubtitle(session.connection?.name ?? "")
         .task { await sampleLedgers() }
     }
 
@@ -87,7 +88,7 @@ struct OverviewView: View {
         isPinging = true
         Task {
             do {
-                try await model.refreshLatency()
+                try await session.refreshLatency()
                 pingError = nil
             } catch {
                 pingError = error
@@ -97,11 +98,11 @@ struct OverviewView: View {
     }
 
     private func sampleLedgers() async {
-        guard let client = model.client else { return }
+        guard let client = session.client else { return }
         do {
             let accounts = try await client.queryAccounts(QueryFilter(limit: tbMaxLimit))
             sampledAccounts = accounts.count
-            model.observe(accounts)
+            session.observe(accounts)
         } catch {
             sampleError = error
         }

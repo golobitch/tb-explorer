@@ -11,7 +11,8 @@ enum AccountTab: String, CaseIterable, Identifiable {
 
 struct AccountView: View {
     let accountID: UInt128
-    @Environment(AppModel.self) private var model
+    @Environment(Session.self) private var session
+    @Environment(Browser.self) private var browser
     @State private var account: Account?
     @State private var error: Error?
     @AppStorage("account.tab") private var tab: AccountTab = .transfers
@@ -21,11 +22,11 @@ struct AccountView: View {
         Group {
             if let account {
                 VStack(spacing: 0) {
-                    AccountHeader(account: account, style: model.amountStyle(currency: currencyFormat))
+                    AccountHeader(account: account, style: session.amountStyle(currency: currencyFormat))
                     Divider()
                     switch tab {
-                    case .transfers: AccountTransfersTab(account: account, style: model.amountStyle(currency: currencyFormat))
-                    case .balances: BalanceHistoryTab(account: account, style: model.amountStyle(currency: currencyFormat))
+                    case .transfers: AccountTransfersTab(account: account, style: session.amountStyle(currency: currencyFormat))
+                    case .balances: BalanceHistoryTab(account: account, style: session.amountStyle(currency: currencyFormat))
                     case .raw: RawView(text: account.rawDescription)
                     }
                 }
@@ -62,17 +63,17 @@ struct AccountView: View {
     }
 
     private func subtitle(for account: Account) -> String {
-        let style = model.amountStyle(currency: currencyFormat)
+        let style = session.amountStyle(currency: currencyFormat)
         return "Ledger \(style.ledgerLabel(account.ledger)) · Code \(style.accountCodeLabel(account.code))"
     }
 
     private func load() async {
-        guard let client = model.client else { return }
+        guard let client = session.client else { return }
         do {
             let a = try await client.lookupAccount(accountID)
             account = a
             error = nil
-            model.observe([a])
+            session.observe([a])
         } catch {
             self.error = error
         }
@@ -82,7 +83,8 @@ struct AccountView: View {
 private struct AccountHeader: View {
     let account: Account
     let style: AmountStyle
-    @Environment(AppModel.self) private var model
+    @Environment(Session.self) private var session
+    @Environment(Browser.self) private var browser
 
     var body: some View {
         Grid(alignment: .leading, horizontalSpacing: 28, verticalSpacing: 8) {
@@ -98,7 +100,7 @@ private struct AccountHeader: View {
             GridRow {
                 cell("ID") { HStack(spacing: 4) { IDText(id: account.id); CopyButton(value: String(account.id)) } }
                 cell("Ledger") {
-                    Button(style.ledgerLabel(account.ledger)) { model.open(.ledger(account.ledger)) }
+                    Button(style.ledgerLabel(account.ledger)) { browser.open(.ledger(account.ledger)) }
                         .buttonStyle(.link)
                         .monospacedDigit()
                 }
@@ -127,7 +129,8 @@ private struct AccountHeader: View {
 private struct AccountTransfersTab: View {
     let account: Account
     let style: AmountStyle
-    @Environment(AppModel.self) private var model
+    @Environment(Session.self) private var session
+    @Environment(Browser.self) private var browser
     @AppStorage("account.debits") private var debits = true
     @AppStorage("account.credits") private var credits = true
     @AppStorage("account.newestFirst") private var newestFirst = true
@@ -207,7 +210,7 @@ private struct AccountTransfersTab: View {
             accountID: account.id, debits: debits, credits: credits, reversed: newestFirst,
             filter: applied, pinnedID: pinned?.id
         )) {
-            guard let client = model.client else { return }
+            guard let client = session.client else { return }
             if let t = pinned {
                 await list.reset(source: FixedSource(items: [t]), reversed: newestFirst)
             } else {
@@ -220,7 +223,7 @@ private struct AccountTransfersTab: View {
                             userData64: f.userData64, userData32: f.userData32, reversed: newestFirst)),
                     reversed: newestFirst)
             }
-            model.observe(list.items)
+            session.observe(list.items)
         }
         #if DEBUG
         .onAppear(perform: applyDebugArguments)
@@ -241,7 +244,7 @@ private struct AccountTransfersTab: View {
                     "Transfer \(String(t.id)) doesn’t involve this account (\(String(t.debitAccountID)) → \(String(t.creditAccountID)))",
                     systemImage: "arrow.triangle.branch")
                     .foregroundStyle(.orange)
-                RouteButton("Open Transfer", route: .transfer(t.id), open: model.open)
+                RouteButton("Open Transfer", route: .transfer(t.id), open: browser.open)
                     .controlSize(.small)
             case .notFound(let id):
                 Label("No transfer with ID \(String(id))", systemImage: "questionmark.circle")
@@ -280,7 +283,7 @@ private struct AccountTransfersTab: View {
     }
 
     private func performSearch() async {
-        guard let request = searchRequest, let client = model.client else { return }
+        guard let request = searchRequest, let client = session.client else { return }
         isSearching = true
         defer { isSearching = false }
         do {
@@ -289,7 +292,7 @@ private struct AccountTransfersTab: View {
                 search = .found(t)
             case .otherAccounts(let t):
                 search = .elsewhere(t)
-                model.observe([t])
+                session.observe([t])
             case .notFound:
                 search = .notFound(request.id)
             }
@@ -343,7 +346,8 @@ private struct TransfersQuery: Hashable {
 private struct BalanceHistoryTab: View {
     let account: Account
     let style: AmountStyle
-    @Environment(AppModel.self) private var model
+    @Environment(Session.self) private var session
+    @Environment(Browser.self) private var browser
     @State private var balances: [Balance]?
     @State private var error: Error?
 
@@ -375,7 +379,7 @@ private struct BalanceHistoryTab: View {
     }
 
     private func load() async {
-        guard let client = model.client else { return }
+        guard let client = session.client else { return }
         do {
             balances = try await client.accountBalances(account.id, AccountFilter(limit: tbMaxLimit))
         } catch {
@@ -395,7 +399,8 @@ private struct BalanceHistoryContent: View {
     let balances: [Balance]
     let ledger: UInt32
     let style: AmountStyle
-    @Environment(AppModel.self) private var model
+    @Environment(Session.self) private var session
+    @Environment(Browser.self) private var browser
     @State private var selection = Set<UInt64>()
     @State private var hoverDate: Date?
 
@@ -504,9 +509,9 @@ private struct BalanceHistoryContent: View {
 
     /// A balance snapshot shares its timestamp with the transfer that produced it.
     private func openTransfer(at ts: UInt64) {
-        guard let client = model.client else { return }
+        guard let client = session.client else { return }
         Task {
-            if let t = try? await client.transfer(atTimestamp: ts) { model.open(.transfer(t.id)) }
+            if let t = try? await client.transfer(atTimestamp: ts) { browser.open(.transfer(t.id)) }
         }
     }
 }

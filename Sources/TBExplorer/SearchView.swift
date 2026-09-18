@@ -18,7 +18,8 @@ struct SearchView: View {
         var generation: Int
     }
 
-    @Environment(AppModel.self) private var model
+    @Environment(Session.self) private var session
+    @Environment(Browser.self) private var browser
     @State private var idInput = ""
     @State private var idError: Error?
     @State private var isLooking = false
@@ -105,11 +106,11 @@ struct SearchView: View {
                     case .accounts:
                         AccountsTable(
                             list: accounts, emptyText: "No Matching Accounts",
-                            style: model.amountStyle(currency: currencyFormat))
+                            style: session.amountStyle(currency: currencyFormat))
                     case .transfers:
                         TransfersTable(
                             list: transfers, emptyText: "No Matching Transfers",
-                            style: model.amountStyle(currency: currencyFormat))
+                            style: session.amountStyle(currency: currencyFormat))
                     }
                 } else {
                     ContentUnavailableView("Run a Query", systemImage: "magnifyingglass",
@@ -126,7 +127,7 @@ struct SearchView: View {
         isLooking = true
         idError = nil
         Task {
-            do { try await model.goTo(idInput) } catch { idError = error }
+            do { try await browser.goTo(idInput) } catch { idError = error }
             isLooking = false
         }
     }
@@ -152,7 +153,7 @@ struct SearchView: View {
     }
 
     private func execute() async {
-        guard let q = query, let client = model.client else { return }
+        guard let q = query, let client = session.client else { return }
         let base = QueryFilter(
             ledger: q.ledger, code: q.filter.code, userData128: q.filter.userData128,
             userData64: q.filter.userData64, userData32: q.filter.userData32,
@@ -160,10 +161,10 @@ struct SearchView: View {
         switch q.kind {
         case .accounts:
             await accounts.reset(source: QueryAccountsSource(client: client, base: base), reversed: q.reversed)
-            model.observe(accounts.items)
+            session.observe(accounts.items)
         case .transfers:
             await transfers.reset(source: QueryTransfersSource(client: client, base: base), reversed: q.reversed)
-            model.observe(transfers.items)
+            session.observe(transfers.items)
         }
     }
 }

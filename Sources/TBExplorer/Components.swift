@@ -14,7 +14,7 @@ func copyToPasteboard(_ string: String) {
 ///   reading an `@Observable` value from the environment there traps. Parents pass `open`.
 /// - A bare `UInt128` captured by an escaping closure can be miscompiled (its high 64 bits
 ///   read as garbage). The route is therefore a stored property read through `self`, and
-///   `open` receives it as an argument (pass a method reference such as `model.open`).
+///   `open` receives it as an argument (pass a method reference such as `browser.open`).
 struct IDText: View {
     let id: UInt128
     var route: Route? = nil

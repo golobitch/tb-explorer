@@ -2,23 +2,16 @@ import Foundation
 import Observation
 import TBKit
 
-enum SidebarItem: Hashable {
-    case overview
-    case search
-    case accounts
-    case transfers
-    case ledger(UInt32)
-}
-
-enum Route: Hashable {
-    case ledger(UInt32)
-    case account(UInt128)
-    case transfer(UInt128)
-}
-
+/// The connection to one cluster, shared by every window.
+///
+/// Exactly one instance may exist: `ConnectionStore` and `MetadataStore` each read their file
+/// once and write it back whole, so a second session would quietly overwrite the first one's
+/// edits to `connections.json` or `metadata.json`. Windows hold a `Browser` each and share this.
 @MainActor
 @Observable
-final class AppModel {
+final class Session {
+    static let shared = Session()
+
     let store = ConnectionStore()
     let metadataStore = MetadataStore()
 
@@ -32,25 +25,11 @@ final class AppModel {
     /// TigerBeetle cannot enumerate ledgers; they are collected from everything loaded this session.
     private(set) var ledgers: [UInt32] = []
 
-    var sidebar: SidebarItem? = .overview {
-        didSet { if oldValue != sidebar { history.reset() } }
-    }
-    private var history = NavigationHistory<Route>()
-    var isGoToPresented = false
+    /// Bumped on every connect and disconnect. Windows watch it and reset their navigation,
+    /// since routes belong to the cluster they were opened from.
+    private(set) var connectionToken = 0
 
-    /// Bound to the `NavigationStack`, which also writes it directly — `adopt` reconciles that
-    /// write so a route popped by its back button still becomes a forward entry. The guard is
-    /// load-bearing: `@Observable` reports a mutation for any `mutating` call, even an inert one.
-    var path: [Route] {
-        get { history.stack }
-        set {
-            guard newValue != history.stack else { return }
-            history.adopt(newValue)
-        }
-    }
-
-    var canGoBack: Bool { history.canGoBack }
-    var canGoForward: Bool { history.canGoForward }
+    var metadataError: String?
 
     var isConnected: Bool { client != nil }
 
@@ -67,8 +46,7 @@ final class AppModel {
         self.info = info
         self.connection = used
         clusterMetadata = metadataStore.metadata(for: used.id)
-        sidebar = .overview
-        history.reset()
+        connectionToken += 1
     }
 
     #if DEBUG
@@ -84,6 +62,7 @@ final class AppModel {
         self.info = info
         self.connection = connection
         clusterMetadata = metadataStore.metadata(for: connection.id)
+        connectionToken += 1
     }
     #endif
 
@@ -94,8 +73,7 @@ final class AppModel {
         connection = nil
         clusterMetadata = ClusterMetadata()
         ledgers = []
-        history.reset()
-        sidebar = .overview
+        connectionToken += 1
     }
 
     /// How to render amounts and codes; `currency` is the user's `format.currency` setting.
@@ -114,46 +92,26 @@ final class AppModel {
         }
     }
 
-    var metadataError: String?
-
     func refreshLatency() async throws {
         guard let client, var info else { return }
         info.latency = try await client.ping()
         self.info = info
     }
 
-    func select(_ item: SidebarItem) {
-        sidebar = item
-        history.reset()
-    }
-
-    func open(_ route: Route) {
-        if case .ledger(let l) = route { observe(ledger: l) }
-        history.push(route)
-    }
-
-    func goBack() {
-        history.back()
-    }
-
-    func goForward() {
-        history.forwardOne()
-        if case .ledger(let l)? = history.stack.last { observe(ledger: l) }
-    }
-
-    /// Resolves an id to an account or transfer and navigates to it.
-    func goTo(_ raw: String) async throws {
-        guard let client else { return }
+    /// Resolves an id to the account or transfer it names. The lookup belongs here, with the
+    /// client; navigating to the result belongs to the window that asked (`Browser.goTo`).
+    func resolve(_ raw: String) async throws -> Route {
+        guard let client else { throw TBError.unexpected("Not connected.") }
         guard let id = UInt128(tbString: raw) else {
             throw TBError.unexpected("“\(raw)” is not a valid u128 id.")
         }
         switch try await client.lookupID(id) {
         case .account(let a):
             observe([a])
-            open(.account(a.id))
+            return .account(a.id)
         case .transfer(let t):
             observe([t])
-            open(.transfer(t.id))
+            return .transfer(t.id)
         case .none:
             throw TBError.notFound("Account or transfer \(id)")
         }

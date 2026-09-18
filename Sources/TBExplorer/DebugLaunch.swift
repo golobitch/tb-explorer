@@ -18,8 +18,8 @@ import TBKit
 /// - `-TBSettings YES`: opens the Settings window (snapshots then capture it)
 /// - `-TBSnapshot <name>`: after loading, draw the main window to `<name>.png` in the
 ///   app's temporary directory and quit. Needs no Screen Recording permission.
-extension AppModel {
-    func applyDebugLaunchArguments() async {
+extension Session {
+    func applyDebugLaunchArguments(_ browser: Browser) async {
         let defaults = UserDefaults.standard
         if let tab = defaults.string(forKey: "TBTab") {
             defaults.set(tab, forKey: "account.tab")
@@ -31,9 +31,9 @@ extension AppModel {
             await debugConnect(address: address)
             applyDebugFormats()
             if isConnected, let target = defaults.string(forKey: "TBOpen") {
-                for step in target.split(separator: ",") { debugOpen(String(step)) }
-                for _ in 0..<defaults.integer(forKey: "TBBack") { goBack() }
-                for _ in 0..<defaults.integer(forKey: "TBForward") { goForward() }
+                for step in target.split(separator: ",") { debugOpen(String(step), in: browser) }
+                for _ in 0..<defaults.integer(forKey: "TBBack") { browser.goBack() }
+                for _ in 0..<defaults.integer(forKey: "TBForward") { browser.goForward() }
             }
         }
         if let snapshot = defaults.string(forKey: "TBSnapshot") {
@@ -70,16 +70,16 @@ extension AppModel {
         adoptDebugMetadata(metadata)
     }
 
-    private func debugOpen(_ target: String) {
+    private func debugOpen(_ target: String, in browser: Browser) {
         let parts = target.split(separator: ":", maxSplits: 1).map(String.init)
         switch (parts.first, parts.count == 2 ? parts[1] : nil) {
-        case ("search", _): select(.search)
-        case ("accounts", _): select(.accounts)
-        case ("transfers", _): select(.transfers)
-        case ("ledger", let id?): if let l = UInt32(id) { observe(ledger: l); select(.ledger(l)) }
-        case ("account", let id?): if let v = UInt128(tbString: id) { open(.account(v)) }
-        case ("transfer", let id?): if let v = UInt128(tbString: id) { open(.transfer(v)) }
-        default: select(.overview)
+        case ("search", _): browser.select(.search)
+        case ("accounts", _): browser.select(.accounts)
+        case ("transfers", _): browser.select(.transfers)
+        case ("ledger", let id?): if let l = UInt32(id) { observe(ledger: l); browser.select(.ledger(l)) }
+        case ("account", let id?): if let v = UInt128(tbString: id) { browser.open(.account(v)) }
+        case ("transfer", let id?): if let v = UInt128(tbString: id) { browser.open(.transfer(v)) }
+        default: browser.select(.overview)
         }
     }
 

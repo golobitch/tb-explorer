@@ -2,16 +2,17 @@ import SwiftUI
 import TBKit
 
 struct ClusterView: View {
-    @Environment(AppModel.self) private var model
+    @Environment(Session.self) private var session
+    @Environment(Browser.self) private var browser
     @State private var columnVisibility = NavigationSplitViewVisibility.all
 
     var body: some View {
-        @Bindable var model = model
+        @Bindable var browser = browser
         NavigationSplitView(columnVisibility: $columnVisibility) {
             Sidebar()
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 300)
         } detail: {
-            NavigationStack(path: $model.path) {
+            NavigationStack(path: $browser.path) {
                 detailRoot
                     .navigationDestination(for: Route.self) { route in
                         switch route {
@@ -24,20 +25,20 @@ struct ClusterView: View {
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button { model.isGoToPresented = true } label: {
+                Button { browser.isGoToPresented = true } label: {
                     Label("Go to ID", systemImage: "number")
                 }
                 .help("Go to ID (⌘K)")
             }
         }
-        .sheet(isPresented: $model.isGoToPresented) {
+        .sheet(isPresented: $browser.isGoToPresented) {
             GoToIDSheet()
         }
     }
 
     @ViewBuilder
     private var detailRoot: some View {
-        switch model.sidebar ?? .overview {
+        switch browser.sidebar ?? .overview {
         case .overview: OverviewView()
         case .search: SearchView()
         case .accounts: AllAccountsView()
@@ -48,15 +49,16 @@ struct ClusterView: View {
 }
 
 private struct Sidebar: View {
-    @Environment(AppModel.self) private var model
+    @Environment(Session.self) private var session
+    @Environment(Browser.self) private var browser
     @Environment(\.openSettings) private var openSettings
     @AppStorage("format.currency") private var currencyFormat = true
     @State private var newLedger = ""
 
     var body: some View {
-        @Bindable var model = model
-        List(selection: $model.sidebar) {
-            Section(model.connection?.name ?? "Cluster") {
+        @Bindable var browser = browser
+        List(selection: $browser.sidebar) {
+            Section(session.connection?.name ?? "Cluster") {
                 Label("Overview", systemImage: "gauge.with.dots.needle.33percent")
                     .tag(SidebarItem.overview)
                 Label("Search", systemImage: "magnifyingglass")
@@ -69,15 +71,15 @@ private struct Sidebar: View {
                     .tag(SidebarItem.transfers)
             }
             Section("Ledgers") {
-                if model.ledgers.isEmpty {
+                if session.ledgers.isEmpty {
                     Text("Ledgers appear as you browse")
                         .font(.callout)
                         .foregroundStyle(.tertiary)
                         .selectionDisabled()
                 }
-                ForEach(model.ledgers, id: \.self) { ledger in
+                ForEach(session.ledgers, id: \.self) { ledger in
                     Label {
-                        Text(model.amountStyle(currency: currencyFormat).ledgerLabel(ledger)).monospacedDigit()
+                        Text(session.amountStyle(currency: currencyFormat).ledgerLabel(ledger)).monospacedDigit()
                     } icon: {
                         Image(systemName: "books.vertical")
                     }
@@ -104,11 +106,11 @@ private struct Sidebar: View {
                 }
                 HStack {
                     Circle().fill(.green).frame(width: 7, height: 7)
-                    Text(model.info.map { "cluster \(String($0.clusterID))" } ?? "")
+                    Text(session.info.map { "cluster \(String($0.clusterID))" } ?? "")
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Button("Disconnect") { model.disconnect() }
+                    Button("Disconnect") { session.disconnect() }
                         .buttonStyle(.borderless)
                         .font(.caption)
                 }
@@ -119,14 +121,15 @@ private struct Sidebar: View {
 
     private func addLedger() {
         guard let l = UInt32(newLedger), l != 0 else { return }
-        model.observe(ledger: l)
-        model.select(.ledger(l))
+        session.observe(ledger: l)
+        browser.select(.ledger(l))
         newLedger = ""
     }
 }
 
 struct GoToIDSheet: View {
-    @Environment(AppModel.self) private var model
+    @Environment(Session.self) private var session
+    @Environment(Browser.self) private var browser
     @Environment(\.dismiss) private var dismiss
     @State private var input = ""
     @State private var error: Error?
@@ -180,7 +183,7 @@ struct GoToIDSheet: View {
         error = nil
         Task {
             do {
-                try await model.goTo(input)
+                try await browser.goTo(input)
                 dismiss()
             } catch {
                 self.error = error

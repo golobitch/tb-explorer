@@ -96,7 +96,7 @@ private struct DigitsModifier: ViewModifier {
 
 struct LedgerView: View {
     let ledger: UInt32
-    @Environment(AppModel.self) private var model
+    @Environment(Session.self) private var session
     @State private var fields = FilterFields()
     @State private var applied = FilterFields.Parsed()
     @State private var filterError: Error?
@@ -113,9 +113,9 @@ struct LedgerView: View {
             Divider()
             AccountsTable(
                 list: list, emptyText: "No Accounts in Ledger \(ledger)",
-                style: model.amountStyle(currency: currencyFormat))
+                style: session.amountStyle(currency: currencyFormat))
         }
-        .navigationTitle(model.amountStyle(currency: currencyFormat).ledgerLabel(ledger))
+        .navigationTitle(session.amountStyle(currency: currencyFormat).ledgerLabel(ledger))
         .navigationSubtitle("query_accounts")
         .toolbar {
             ToolbarItemGroup {
@@ -131,8 +131,8 @@ struct LedgerView: View {
             }
         }
         .task(id: QueryKey(ledger: ledger, filter: applied, reversed: newestFirst)) {
-            model.observe(ledger: ledger)
-            guard let client = model.client else { return }
+            session.observe(ledger: ledger)
+            guard let client = session.client else { return }
             let f = applied
             await list.reset(
                 source: QueryAccountsSource(

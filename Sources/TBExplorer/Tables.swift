@@ -6,7 +6,7 @@ struct AccountsTable: View {
     let emptyText: String
     /// Read once here in the parent; never inside a cell.
     var style: AmountStyle = .raw
-    @Environment(AppModel.self) private var model
+    @Environment(Browser.self) private var browser
     @State private var selection = Set<UInt128>()
 
     var body: some View {
@@ -44,14 +44,14 @@ struct AccountsTable: View {
             .tableStyle(.inset(alternatesRowBackgrounds: true))
             .contextMenu(forSelectionType: UInt128.self) { ids in
                 if ids.count == 1, let id = ids.first {
-                    RouteButton("Open Account", route: .account(id), open: model.open)
+                    RouteButton("Open Account", route: .account(id), open: browser.open)
                     Divider()
                 }
                 Button(ids.count == 1 ? "Copy ID" : "Copy \(ids.count) IDs") {
                     copyToPasteboard(ids.sorted().map { String($0) }.joined(separator: "\n"))
                 }
             } primaryAction: { ids in
-                if let id = ids.first { model.open(.account(id)) }
+                if let id = ids.first { browser.open(.account(id)) }
             }
             .overlay { TableOverlay(list: list, emptyText: emptyText) }
             Divider()
@@ -70,7 +70,7 @@ struct TransfersTable: View {
     let emptyText: String
     /// Read once here in the parent; never inside a cell.
     var style: AmountStyle = .raw
-    @Environment(AppModel.self) private var model
+    @Environment(Browser.self) private var browser
     @State private var selection = Set<UInt128>()
 
     var body: some View {
@@ -92,11 +92,11 @@ struct TransfersTable: View {
                 }
                 .width(min: 50, ideal: 90)
                 TableColumn("Debit Account") { t in
-                    IDText(id: t.debitAccountID, route: .account(t.debitAccountID), open: model.open)
+                    IDText(id: t.debitAccountID, route: .account(t.debitAccountID), open: browser.open)
                 }
                 .width(min: 80, ideal: 130)
                 TableColumn("Credit Account") { t in
-                    IDText(id: t.creditAccountID, route: .account(t.creditAccountID), open: model.open)
+                    IDText(id: t.creditAccountID, route: .account(t.creditAccountID), open: browser.open)
                 }
                 .width(min: 80, ideal: 130)
                 TableColumn("Amount") { t in
@@ -112,11 +112,11 @@ struct TransfersTable: View {
             .tableStyle(.inset(alternatesRowBackgrounds: true))
             .contextMenu(forSelectionType: UInt128.self) { ids in
                 if ids.count == 1, let id = ids.first, let t = list.items.first(where: { $0.id == id }) {
-                    RouteButton("Open Transfer", route: .transfer(id), open: model.open)
-                    RouteButton("Open Debit Account", route: .account(t.debitAccountID), open: model.open)
-                    RouteButton("Open Credit Account", route: .account(t.creditAccountID), open: model.open)
+                    RouteButton("Open Transfer", route: .transfer(id), open: browser.open)
+                    RouteButton("Open Debit Account", route: .account(t.debitAccountID), open: browser.open)
+                    RouteButton("Open Credit Account", route: .account(t.creditAccountID), open: browser.open)
                     if t.pendingID != 0 {
-                        RouteButton("Open Pending Transfer", route: .transfer(t.pendingID), open: model.open)
+                        RouteButton("Open Pending Transfer", route: .transfer(t.pendingID), open: browser.open)
                     }
                     Divider()
                 }
@@ -124,7 +124,7 @@ struct TransfersTable: View {
                     copyToPasteboard(ids.sorted().map { String($0) }.joined(separator: "\n"))
                 }
             } primaryAction: { ids in
-                if let id = ids.first { model.open(.transfer(id)) }
+                if let id = ids.first { browser.open(.transfer(id)) }
             }
             .overlay { TableOverlay(list: list, emptyText: emptyText) }
             Divider()

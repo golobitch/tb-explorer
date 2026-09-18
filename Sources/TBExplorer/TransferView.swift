@@ -3,7 +3,8 @@ import TBKit
 
 struct TransferView: View {
     let transferID: UInt128
-    @Environment(AppModel.self) private var model
+    @Environment(Session.self) private var session
+    @Environment(Browser.self) private var browser
     @State private var chain: Chain?
     @State private var error: Error?
     @State private var lookback = TBClient.defaultLookback
@@ -11,7 +12,7 @@ struct TransferView: View {
     @State private var showRaw = false
     @AppStorage("format.currency") private var currencyFormat = true
 
-    private var style: AmountStyle { model.amountStyle(currency: currencyFormat) }
+    private var style: AmountStyle { session.amountStyle(currency: currencyFormat) }
 
     var body: some View {
         Group {
@@ -63,13 +64,13 @@ struct TransferView: View {
     }
 
     private func load() async {
-        guard let client = model.client else { return }
+        guard let client = session.client else { return }
         isLoading = true
         do {
             let c = try await client.chain(for: transferID, lookback: lookback)
             chain = c
             error = nil
-            model.observe([c.transfer] + c.linked + (c.pending.map { [$0] } ?? []))
+            session.observe([c.transfer] + c.linked + (c.pending.map { [$0] } ?? []))
         } catch {
             self.error = error
         }
@@ -80,7 +81,8 @@ struct TransferView: View {
 private struct TransferSections: View {
     let transfer: Transfer
     let style: AmountStyle
-    @Environment(AppModel.self) private var model
+    @Environment(Session.self) private var session
+    @Environment(Browser.self) private var browser
 
     var body: some View {
         Section {
@@ -103,7 +105,7 @@ private struct TransferSections: View {
             LabeledContent("Flags") { FlagsView(names: transfer.flags.names, emptyText: "None") }
             LabeledContent("Pending ID") {
                 if transfer.pendingID == 0 { Text("—").foregroundStyle(.tertiary) } else {
-                    IDText(id: transfer.pendingID, route: .transfer(transfer.pendingID), open: model.open)
+                    IDText(id: transfer.pendingID, route: .transfer(transfer.pendingID), open: browser.open)
                 }
             }
             LabeledContent("Timeout") {
@@ -111,7 +113,7 @@ private struct TransferSections: View {
                     .monospacedDigit()
             }
             LabeledContent("Ledger") {
-                Button(style.ledgerLabel(transfer.ledger)) { model.open(.ledger(transfer.ledger)) }
+                Button(style.ledgerLabel(transfer.ledger)) { browser.open(.ledger(transfer.ledger)) }
                     .buttonStyle(.link)
             }
             LabeledContent("Code") { CodeText(code: transfer.code, kind: .transfer, style: style) }
@@ -125,7 +127,7 @@ private struct TransferSections: View {
     private func accountCell(_ title: String, _ id: UInt128, _ tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title).font(.caption).foregroundStyle(tint)
-            IDText(id: id, route: .account(id), open: model.open)
+            IDText(id: id, route: .account(id), open: browser.open)
         }
     }
 }
@@ -199,7 +201,8 @@ struct TransferRow: View {
     let transfer: Transfer
     var isCurrent = false
     var style: AmountStyle = .raw
-    @Environment(AppModel.self) private var model
+    @Environment(Session.self) private var session
+    @Environment(Browser.self) private var browser
 
     var body: some View {
         HStack(spacing: 12) {
@@ -210,7 +213,7 @@ struct TransferRow: View {
                 if isCurrent {
                     IDText(id: transfer.id)
                 } else {
-                    IDText(id: transfer.id, route: .transfer(transfer.id), open: model.open)
+                    IDText(id: transfer.id, route: .transfer(transfer.id), open: browser.open)
                 }
                 TimestampText(ns: transfer.timestamp).font(.caption)
             }

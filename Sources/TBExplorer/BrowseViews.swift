@@ -3,7 +3,8 @@ import TBKit
 
 /// Every account in the cluster: `query_accounts` with optional filters, paged by timestamp.
 struct AllAccountsView: View {
-    @Environment(AppModel.self) private var model
+    @Environment(Session.self) private var session
+    @Environment(Browser.self) private var browser
     @State private var fields = FilterFields()
     @State private var applied = FilterFields.Parsed()
     @State private var filterError: Error?
@@ -26,7 +27,7 @@ struct AllAccountsView: View {
             AccountsTable(
                 list: list,
                 emptyText: applied == FilterFields.Parsed() ? "No Accounts" : "No Accounts Match These Filters",
-                style: model.amountStyle(currency: currencyFormat))
+                style: session.amountStyle(currency: currencyFormat))
         }
         .navigationTitle("Accounts")
         .navigationSubtitle("query_accounts")
@@ -35,11 +36,11 @@ struct AllAccountsView: View {
         .onSubmit(of: .search) { lookup.submit() }
         .task(id: lookup.request) { await openAccount() }
         .task(id: BrowseQuery(filter: applied, reversed: newestFirst)) {
-            guard let client = model.client else { return }
+            guard let client = session.client else { return }
             await list.reset(
                 source: QueryAccountsSource(client: client, base: applied.queryFilter(reversed: newestFirst)),
                 reversed: newestFirst)
-            model.observe(list.items)
+            session.observe(list.items)
         }
     }
 
@@ -53,12 +54,12 @@ struct AllAccountsView: View {
     }
 
     private func openAccount() async {
-        guard let request = lookup.request, let client = model.client else { return }
+        guard let request = lookup.request, let client = session.client else { return }
         do {
             if let account = try await client.lookupAccounts([request.id]).first {
-                model.observe([account])
+                session.observe([account])
                 lookup.clear()
-                model.open(.account(account.id))
+                browser.open(.account(account.id))
             } else {
                 lookup.message = "No account with ID \(String(request.id))."
             }
@@ -70,7 +71,8 @@ struct AllAccountsView: View {
 
 /// Every transfer in the cluster: `query_transfers` with optional filters, paged by timestamp.
 struct AllTransfersView: View {
-    @Environment(AppModel.self) private var model
+    @Environment(Session.self) private var session
+    @Environment(Browser.self) private var browser
     @State private var fields = FilterFields()
     @State private var applied = FilterFields.Parsed()
     @State private var filterError: Error?
@@ -93,7 +95,7 @@ struct AllTransfersView: View {
             TransfersTable(
                 list: list,
                 emptyText: applied == FilterFields.Parsed() ? "No Transfers" : "No Transfers Match These Filters",
-                style: model.amountStyle(currency: currencyFormat))
+                style: session.amountStyle(currency: currencyFormat))
         }
         .navigationTitle("Transfers")
         .navigationSubtitle("query_transfers")
@@ -102,11 +104,11 @@ struct AllTransfersView: View {
         .onSubmit(of: .search) { lookup.submit() }
         .task(id: lookup.request) { await openTransfer() }
         .task(id: BrowseQuery(filter: applied, reversed: newestFirst)) {
-            guard let client = model.client else { return }
+            guard let client = session.client else { return }
             await list.reset(
                 source: QueryTransfersSource(client: client, base: applied.queryFilter(reversed: newestFirst)),
                 reversed: newestFirst)
-            model.observe(list.items)
+            session.observe(list.items)
         }
     }
 
@@ -120,12 +122,12 @@ struct AllTransfersView: View {
     }
 
     private func openTransfer() async {
-        guard let request = lookup.request, let client = model.client else { return }
+        guard let request = lookup.request, let client = session.client else { return }
         do {
             if let transfer = try await client.lookupTransfers([request.id]).first {
-                model.observe([transfer])
+                session.observe([transfer])
                 lookup.clear()
-                model.open(.transfer(transfer.id))
+                browser.open(.transfer(transfer.id))
             } else {
                 lookup.message = "No transfer with ID \(String(request.id))."
             }
