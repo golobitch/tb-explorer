@@ -116,6 +116,24 @@ fn dump_frame(app: &mut App, view: &str) -> String {
         "transfers" => app.show(View::Transfers),
         "ledgers" => app.show(View::Ledgers),
         "help" => app.toggle_help(),
+        other if other.starts_with("account:") => {
+            if let Ok(id) = other["account:".len()..].parse() {
+                app.push(View::Account {
+                    id,
+                    balances: false,
+                });
+            }
+        }
+        other if other.starts_with("balances:") => {
+            if let Ok(id) = other["balances:".len()..].parse() {
+                app.push(View::Account { id, balances: true });
+            }
+        }
+        other if other.starts_with("transfer:") => {
+            if let Ok(id) = other["transfer:".len()..].parse() {
+                app.push(View::Transfer { id });
+            }
+        }
         _ => {}
     }
 
@@ -165,6 +183,8 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         KeyCode::Char('g') | KeyCode::Home => app.select_first(),
         KeyCode::Char('G') | KeyCode::End => app.select_last(),
         KeyCode::Char('o') => app.toggle_order(),
+        KeyCode::Enter => app.open_selection(),
+        KeyCode::Char('b') => app.toggle_balances(),
         _ => {}
     }
 }

@@ -2,7 +2,9 @@
 
 use std::time::{Duration, Instant};
 
-use tbclient::{Account, Balance, QueryFilter, TbError, Transfer};
+use tbclient::{
+    Account, AccountFilter, Balance, Chain, DEFAULT_LOOKBACK, QueryFilter, TbError, Transfer,
+};
 
 use crate::worker::{Query, Update, Worker};
 
@@ -12,14 +14,27 @@ pub enum View {
     Accounts,
     Transfers,
     Ledgers,
+    /// One account: its transfers, or its balance history.
+    Account {
+        id: u128,
+        balances: bool,
+    },
+    /// One transfer, with whatever chain it belongs to.
+    Transfer {
+        id: u128,
+    },
 }
 
 impl View {
-    pub fn title(&self) -> &'static str {
+    pub fn title(&self) -> String {
         match self {
-            Self::Accounts => "accounts",
-            Self::Transfers => "transfers",
-            Self::Ledgers => "ledgers",
+            Self::Accounts => "accounts".to_string(),
+            Self::Transfers => "transfers".to_string(),
+            Self::Ledgers => "ledgers".to_string(),
+            Self::Account { id, balances } => {
+                format!("account {id}{}", if *balances { " › balances" } else { "" })
+            }
+            Self::Transfer { id } => format!("transfer {id}"),
         }
     }
 
@@ -29,6 +44,11 @@ impl View {
             Self::Accounts => "query_accounts",
             Self::Transfers => "query_transfers",
             Self::Ledgers => "collected while browsing",
+            Self::Account {
+                balances: false, ..
+            } => "get_account_transfers",
+            Self::Account { balances: true, .. } => "get_account_balances",
+            Self::Transfer { .. } => "lookup_transfers",
         }
     }
 }
@@ -72,7 +92,10 @@ pub struct App {
     pub addresses: String,
     pub latency: Option<Duration>,
     pub view: View,
+    /// Where `esc` goes back to. A k9s habit: one key, one step.
+    pub stack: Vec<View>,
     pub rows: Rows,
+    pub chain: Option<Box<Chain>>,
     pub selected: usize,
     pub mode: Mode,
     pub status: Option<String>,
@@ -94,7 +117,9 @@ impl App {
             addresses,
             latency: None,
             view: View::Accounts,
+            stack: Vec::new(),
             rows: Rows::None,
+            chain: None,
             selected: 0,
             mode: Mode::Normal,
             status: None,
@@ -136,11 +161,79 @@ impl App {
                 self.rows = Rows::Ledgers(self.ledgers.clone());
                 self.loading = false;
             }
+            View::Account { id, balances } => {
+                let filter = AccountFilter {
+                    account_id: id,
+                    limit: 200,
+                    reversed: self.newest_first,
+                    ..Default::default()
+                };
+                if balances {
+                    self.worker.send(Query::AccountBalances { filter });
+                } else {
+                    self.worker.send(Query::AccountTransfers {
+                        filter,
+                        append: false,
+                    });
+                }
+            }
+            View::Transfer { id } => {
+                self.chain = None;
+                self.worker.send(Query::Chain {
+                    id,
+                    lookback: DEFAULT_LOOKBACK,
+                });
+            }
         }
     }
 
+    /// Opens a view and remembers where it came from.
+    pub fn push(&mut self, view: View) {
+        if self.view == view {
+            return;
+        }
+        self.stack.push(self.view.clone());
+        self.view = view;
+        self.selected = 0;
+        self.rows = Rows::None;
+        self.reload();
+    }
+
+    /// Opens whatever the selected row points at: an account from a list of accounts, a transfer
+    /// from a list of transfers, a ledger's accounts from the ledger list.
+    pub fn open_selection(&mut self) {
+        let next = match &self.rows {
+            Rows::Accounts(rows) => rows.get(self.selected).map(|a| View::Account {
+                id: a.id,
+                balances: false,
+            }),
+            Rows::Transfers(rows) => rows.get(self.selected).map(|t| View::Transfer { id: t.id }),
+            Rows::Ledgers(rows) => rows.get(self.selected).map(|_| View::Accounts),
+            _ => None,
+        };
+        if let Some(next) = next {
+            self.push(next);
+        }
+    }
+
+    /// `b` on an account swaps its transfers for its balance history, in place.
+    pub fn toggle_balances(&mut self) {
+        if let View::Account { id, balances } = self.view {
+            self.view = View::Account {
+                id,
+                balances: !balances,
+            };
+            self.selected = 0;
+            self.rows = Rows::None;
+            self.reload();
+        }
+    }
+
+    /// A top-level view: the stack starts over, the way k9s's `:` command does.
     pub fn show(&mut self, view: View) {
         if self.view != view {
+            self.stack.clear();
+            self.chain = None;
             self.view = view;
             self.selected = 0;
             self.rows = Rows::None;
@@ -190,6 +283,11 @@ impl App {
                     tbclient::Found::Transfer(t) => format!("transfer {}", t.id),
                     tbclient::Found::Nothing => "no account or transfer with that id".to_string(),
                 });
+                self.loading = false;
+            }
+            Update::Chain(chain) => {
+                self.rows = Rows::Transfers(chain_rows(&chain));
+                self.chain = Some(chain);
                 self.loading = false;
             }
             Update::Latency(latency) => self.latency = Some(latency),
@@ -254,8 +352,12 @@ impl App {
                 if self.status.is_some() || self.error.is_some() {
                     self.status = None;
                     self.error = None;
-                } else if self.view != View::Accounts {
-                    self.show(View::Accounts);
+                } else if let Some(previous) = self.stack.pop() {
+                    self.view = previous;
+                    self.selected = 0;
+                    self.rows = Rows::None;
+                    self.chain = None;
+                    self.reload();
                 }
             }
         }
@@ -266,15 +368,26 @@ impl App {
         self.reload();
     }
 
+    /// Where you are, and how you got here.
     pub fn breadcrumbs(&self) -> String {
-        let mut crumbs = vec![self.view.title().to_string()];
-        if !self.rows.is_empty() {
-            if let Rows::Accounts(rows) = &self.rows {
-                if let Some(account) = rows.get(self.selected) {
-                    crumbs.push(account.id.to_string());
-                }
-            }
-        }
+        let mut crumbs: Vec<String> = self.stack.iter().map(|view| view.title()).collect();
+        crumbs.push(self.view.title());
         crumbs.join(" › ")
     }
+}
+
+/// A chain reads as one list: the pending transfer, the transfer itself, whatever resolved it and
+/// the rest of its linked group, in the order they happened.
+fn chain_rows(chain: &Chain) -> Vec<Transfer> {
+    let mut rows = vec![chain.transfer];
+    if let Some(pending) = chain.pending {
+        rows.push(pending);
+    }
+    if let Some(resolution) = &chain.resolution {
+        rows.extend(resolution.resolutions.iter().copied());
+    }
+    rows.extend(chain.linked.iter().copied());
+    rows.sort_by_key(|t| t.timestamp);
+    rows.dedup_by_key(|t| t.id);
+    rows
 }

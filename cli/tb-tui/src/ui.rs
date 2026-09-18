@@ -14,6 +14,8 @@ pub const KEYS: &[(&str, &str)] = &[
     ("3", "ledgers"),
     ("j / k, ↓ / ↑", "move"),
     ("g / G", "first / last row"),
+    ("enter", "open the selected row"),
+    ("b", "balances, on an account"),
     ("o", "newest first"),
     ("ctrl-r", "refresh"),
     ("esc", "back"),
@@ -82,6 +84,27 @@ fn draw_header(frame: &mut Frame, area: Rect, app: &App) {
         ),
     ]);
 
+    let mut second = second;
+    if let Some(chain) = &app.chain
+        && let Some(resolution) = &chain.resolution
+    {
+        second.push_span(Span::raw("  "));
+        second.push_span(Span::styled(
+            resolution.status.label(),
+            Style::new().fg(match resolution.status {
+                tbclient::PendingStatus::Posted => Color::Green,
+                tbclient::PendingStatus::Voided => Color::Red,
+                tbclient::PendingStatus::Expired => Color::Gray,
+                _ => Color::Yellow,
+            }),
+        ));
+        if resolution.status == tbclient::PendingStatus::Unknown {
+            second.push_span(Span::styled(
+                format!("  scanned {}", resolution.scanned),
+                Style::new().fg(Color::DarkGray),
+            ));
+        }
+    }
     frame.render_widget(Paragraph::new(vec![first, second]), area);
 }
 
@@ -242,10 +265,12 @@ fn draw_body(frame: &mut Frame, area: Rect, app: &App) {
 
 fn draw_footer(frame: &mut Frame, area: Rect, app: &App) {
     let count = app.rows.len();
-    let noun = match app.view {
-        View::Accounts => "accounts",
-        View::Transfers => "transfers",
-        View::Ledgers => "ledgers",
+    let noun = match (&app.view, &app.rows) {
+        (_, Rows::Balances(_)) => "balances",
+        (_, Rows::Ledgers(_)) => "ledgers",
+        (_, Rows::Accounts(_)) => "accounts",
+        (View::Transfer { .. }, _) => "in this chain",
+        _ => "transfers",
     };
 
     let mut spans = vec![
@@ -261,7 +286,7 @@ fn draw_footer(frame: &mut Frame, area: Rect, app: &App) {
         spans.push(Span::styled(status.clone(), Style::new().fg(Color::Yellow)));
     }
     spans.push(Span::styled(
-        "   <1> accounts <2> transfers <3> ledgers  ? help",
+        "   <1> accounts <2> transfers <3> ledgers  enter opens  ? help",
         Style::new().fg(Color::DarkGray),
     ));
 

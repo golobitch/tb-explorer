@@ -8,10 +8,10 @@ use std::sync::Arc;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
 
-use tbclient::{Account, AccountFilter, Balance, Client, QueryFilter, TbError, Transfer};
+use tbclient::{Account, AccountFilter, Balance, Chain, Client, QueryFilter, TbError, Transfer};
 
-/// Some variants are served by views that land in the next slice; the worker handles them now so
-/// the query surface stays in one place.
+/// `Lookup` is served by the `:` command mode in the next slice; the worker handles the whole
+/// query surface in one place rather than growing a variant per view.
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum Query {
@@ -20,6 +20,7 @@ pub enum Query {
     AccountTransfers { filter: AccountFilter, append: bool },
     AccountBalances { filter: AccountFilter },
     Lookup { id: u128 },
+    Chain { id: u128, lookback: u32 },
     Ping,
 }
 
@@ -29,6 +30,7 @@ pub enum Update {
     Transfers { rows: Vec<Transfer>, append: bool },
     Balances { rows: Vec<Balance> },
     Found(tbclient::Found),
+    Chain(Box<Chain>),
     Latency(std::time::Duration),
     Failed(TbError),
 }
@@ -83,6 +85,10 @@ fn run(client: &Client, query: Query) -> Update {
         },
         Query::Lookup { id } => match client.lookup_id(id) {
             Ok(found) => Update::Found(found),
+            Err(error) => Update::Failed(error),
+        },
+        Query::Chain { id, lookback } => match client.chain(id, lookback) {
+            Ok(chain) => Update::Chain(Box::new(chain)),
             Err(error) => Update::Failed(error),
         },
         Query::Ping => match client.ping() {

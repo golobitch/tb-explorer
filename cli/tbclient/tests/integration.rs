@@ -194,3 +194,105 @@ fn a_reversed_query_returns_newest_first() {
     assert!(newest[0].timestamp > oldest[0].timestamp);
     assert!(newest.windows(2).all(|w| w[0].timestamp > w[1].timestamp));
 }
+
+#[test]
+fn resolves_pending_transfers_the_way_the_swift_client_does() {
+    use tbclient::{DEFAULT_LOOKBACK, PendingStatus, models::transfer_flags};
+    let Some(client) = cluster() else { return };
+
+    // The seed writes posted, voided, expired and never-resolved pendings; find one of each shape
+    // by walking the transfers it created.
+    let transfers = client
+        .query_transfers(&tbclient::QueryFilter {
+            limit: 600,
+            ..Default::default()
+        })
+        .expect("query");
+    let pendings: Vec<_> = transfers
+        .iter()
+        .filter(|t| t.flags & transfer_flags::PENDING != 0)
+        .collect();
+    assert!(!pendings.is_empty(), "the seed creates pending transfers");
+
+    // The seed writes its pendings in batches — all the posted ones, then the voided ones — so a
+    // sample has to be spread across the set rather than taken from the front.
+    let step = (pendings.len() / 12).max(1);
+    let mut seen = Vec::new();
+    for pending in pendings.iter().step_by(step) {
+        let chain = client.chain(pending.id, DEFAULT_LOOKBACK).expect("chain");
+        let resolution = chain
+            .resolution
+            .expect("a pending transfer has a resolution");
+        seen.push(resolution.status);
+
+        match resolution.status {
+            PendingStatus::Posted => assert!(
+                resolution
+                    .resolutions
+                    .iter()
+                    .any(|t| t.flags & transfer_flags::POST_PENDING_TRANSFER != 0)
+            ),
+            PendingStatus::Voided => assert!(
+                resolution
+                    .resolutions
+                    .iter()
+                    .any(|t| t.flags & transfer_flags::VOID_PENDING_TRANSFER != 0)
+            ),
+            _ => {}
+        }
+    }
+    assert!(
+        seen.contains(&PendingStatus::Posted) && seen.contains(&PendingStatus::Voided),
+        "the seed has both posted and voided pendings; saw {seen:?}"
+    );
+}
+
+#[test]
+fn a_post_points_back_at_its_pending() {
+    use tbclient::{DEFAULT_LOOKBACK, models::transfer_flags};
+    let Some(client) = cluster() else { return };
+
+    let transfers = client
+        .query_transfers(&tbclient::QueryFilter {
+            limit: 600,
+            ..Default::default()
+        })
+        .expect("query");
+    let post = transfers
+        .iter()
+        .find(|t| t.flags & transfer_flags::POST_PENDING_TRANSFER != 0)
+        .expect("the seed posts some pendings");
+
+    let chain = client.chain(post.id, DEFAULT_LOOKBACK).expect("chain");
+    let pending = chain.pending.expect("a post names the pending it resolves");
+    assert_eq!(pending.id, post.pending_id);
+    assert_ne!(pending.flags & transfer_flags::PENDING, 0);
+}
+
+#[test]
+fn linked_groups_come_back_whole() {
+    use tbclient::{DEFAULT_LOOKBACK, models::transfer_flags};
+    let Some(client) = cluster() else { return };
+
+    let transfers = client
+        .query_transfers(&tbclient::QueryFilter {
+            limit: 600,
+            ..Default::default()
+        })
+        .expect("query");
+    let linked = transfers
+        .iter()
+        .find(|t| t.flags & transfer_flags::LINKED != 0)
+        .expect("the seed writes linked groups");
+
+    let chain = client.chain(linked.id, DEFAULT_LOOKBACK).expect("chain");
+    assert!(chain.linked.len() > 1, "a linked transfer has company");
+    assert!(
+        chain
+            .linked
+            .windows(2)
+            .all(|w| w[1].timestamp == w[0].timestamp + 1),
+        "a linked group is contiguous in time"
+    );
+    assert!(chain.linked.iter().any(|t| t.id == linked.id));
+}
