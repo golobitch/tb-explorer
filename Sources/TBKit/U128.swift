@@ -91,6 +91,24 @@ public enum TBFormat {
         return UInt64(t * 1_000) * 1_000_000
     }
 
+
+    /// `yyyy-MM-ddTHH:mm:ss.nnnnnnnnnZ` in UTC, for files rather than screens: an exported
+    /// timestamp should not depend on the time zone of the machine that wrote it. Empty for 0,
+    /// since a spreadsheet reads an empty cell as "no value" and 1970 as a date.
+    public static func iso8601(_ ns: UInt64) -> String {
+        guard ns != 0 else { return "" }
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC") ?? .gmt
+        let seconds = Date(timeIntervalSince1970: TimeInterval(ns / 1_000_000_000))
+        let c = cal.dateComponents([.year, .month, .day, .hour, .minute, .second], from: seconds)
+        let frac = String(ns % 1_000_000_000)
+        let pad = String(repeating: "0", count: 9 - frac.count) + frac
+        return String(
+            format: "%04d-%02d-%02dT%02d:%02d:%02d.",
+            c.year ?? 0, c.month ?? 0, c.day ?? 0, c.hour ?? 0, c.minute ?? 0, c.second ?? 0
+        ) + pad + "Z"
+    }
+
     /// `yyyy-MM-dd HH:mm:ss.nnnnnnnnn` in the given time zone, keeping full nanosecond precision.
     public static func timestamp(_ ns: UInt64, timeZone: TimeZone = .current) -> String {
         guard ns != 0 else { return "—" }
