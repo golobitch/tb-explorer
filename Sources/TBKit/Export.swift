@@ -236,3 +236,29 @@ extension SignedAmount {
         isNegative && magnitude != 0 ? "-\(magnitude)" : String(magnitude)
     }
 }
+
+/// The Raw tab's field dump, built from the same fields as an export so the two cannot drift.
+///
+/// Stored fields only, exact: this is the view people check a formatted number against, so
+/// anything the app worked out for itself — a net, an ISO timestamp, decoded flag names — is left
+/// to the rest of the screen.
+extension ExportRow {
+    public var rawDescription: String {
+        let derived = ["flag_names", "net_posted", "timestamp_iso"]
+        let fields = fields(ExportContext()).filter { !derived.contains($0.name) }
+        let width = (fields.map(\.name.count).max() ?? 0) + 2
+        return fields.map { field in
+            let padding = String(repeating: " ", count: width - field.name.count)
+            return field.name + padding + Self.rawValue(field.value)
+        }
+        .joined(separator: "\n")
+    }
+
+    private static func rawValue(_ value: ExportValue) -> String {
+        switch value {
+        case .text(let s): s
+        case .integer(let i): String(i)
+        case .list(let names): names.isEmpty ? "[]" : "[" + names.joined(separator: ", ") + "]"
+        }
+    }
+}
