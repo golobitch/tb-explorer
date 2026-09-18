@@ -31,6 +31,16 @@ final class Session {
 
     var metadataError: String?
 
+    /// A link that arrived before a window could act on it. Holding it here \u{2014} rather than
+    /// acting on arrival \u{2014} is what keeps a URL from ever starting a connection: nothing on
+    /// this path calls `connect`, so a link can only be applied to a cluster the user connected to.
+    private(set) var pendingLink: DeepLink?
+    private(set) var pendingLinkCluster: UInt128?
+    private(set) var pendingLinkToken = 0
+
+    /// Explains why a link is waiting, or why it was refused.
+    var linkMessage: String?
+
     #if DEBUG
     /// `applyDebugLaunchArguments` runs from a window's task, and there can be several windows.
     var debugArgumentsApplied = false
@@ -101,6 +111,40 @@ final class Session {
         guard let client, var info else { return }
         info.latency = try await client.ping()
         self.info = info
+    }
+
+    /// Parks an incoming link. Never connects, never navigates.
+    func receive(_ url: URL) {
+        var cluster: UInt128?
+        guard let link = DeepLink(url, cluster: &cluster) else {
+            linkMessage = "\u{201C}\(url.absoluteString)\u{201D} is not a TigerBeetle Explorer link."
+            return
+        }
+        pendingLink = link
+        pendingLinkCluster = cluster
+        pendingLinkToken += 1
+        linkMessage = isConnected ? nil : "Connect to open \(url.absoluteString)."
+    }
+
+    /// Hands the waiting link to the first window that asks, so several windows can watch for one
+    /// without any of them acting twice. A link for another cluster is refused rather than
+    /// followed: ids are only unique within a cluster.
+    func takePendingLink() -> DeepLink? {
+        guard let link = pendingLink else { return nil }
+        if let expected = pendingLinkCluster, let actual = info?.clusterID, expected != actual {
+            linkMessage = "That link is for cluster \(String(expected)), and this is cluster "
+                + "\(String(actual)). Connect to that cluster and open the link again."
+            clearPendingLink()
+            return nil
+        }
+        clearPendingLink()
+        linkMessage = nil
+        return link
+    }
+
+    private func clearPendingLink() {
+        pendingLink = nil
+        pendingLinkCluster = nil
     }
 
     /// Resolves an id to the account or transfer it names. The lookup belongs here, with the

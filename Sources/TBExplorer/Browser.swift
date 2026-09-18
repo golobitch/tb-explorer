@@ -58,6 +58,7 @@ final class Browser {
 
     func select(_ item: SidebarItem) {
         seenToken = session.connectionToken
+        if case .ledger(let l) = item { session.observe(ledger: l) }
         sidebar = item
         history.reset()
     }
@@ -89,6 +90,19 @@ final class Browser {
     func connectionDidChange() {
         guard seenToken != session.connectionToken else { return }
         reset()
+    }
+
+    /// Navigates to the place a link names.
+    func apply(_ link: DeepLink) {
+        switch link {
+        case .overview: select(.overview)
+        case .search: select(.search)
+        case .accounts: select(.accounts)
+        case .transfers: select(.transfers)
+        case .ledger(let l): select(.ledger(l))
+        case .account(let id): open(.account(id))
+        case .transfer(let id): open(.transfer(id))
+        }
     }
 
     /// Resolves an id to an account or transfer and navigates to it.

@@ -1,4 +1,5 @@
 import SwiftUI
+import TBKit
 
 @main
 struct TBExplorerApp: App {
@@ -9,7 +10,11 @@ struct TBExplorerApp: App {
             BrowserWindow()
                 .environment(session)
                 .frame(minWidth: 900, minHeight: 560)
+                // An open window can service a link…
+                .handlesExternalEvents(preferring: [DeepLink.scheme], allowing: [DeepLink.scheme])
         }
+        // …so following one lands where you are looking instead of stacking up new windows.
+        .handlesExternalEvents(matching: [])
         .defaultSize(width: 1280, height: 820)
         .windowToolbarStyle(.unified)
         // Reopening yesterday's windows would make the debug screenshots non-deterministic,
@@ -29,7 +34,11 @@ struct TBExplorerApp: App {
 /// One window onto the cluster. The connection is shared; this window's navigation is not.
 struct BrowserWindow: View {
     @Environment(Session.self) private var session
+    @Environment(\.controlActiveState) private var controlActive
     @State private var browser = Browser()
+    /// Set when this window is handed a link it cannot act on yet, so the window the link was
+    /// routed to is the one that opens it once a connection exists — whatever has focus by then.
+    @State private var awaitingLink = false
     #if DEBUG
     @Environment(\.openWindow) private var openWindow
     #endif
@@ -39,6 +48,16 @@ struct BrowserWindow: View {
             .environment(browser)
             // Publishes this window's browser to the menu commands while it is focused.
             .focusedSceneValue(browser)
+            // A link is parked on the session; the key window claims it, so exactly one window
+            // acts on it, and a link that arrives while disconnected simply waits.
+            .onOpenURL { url in
+                session.receive(url)
+                awaitingLink = true
+                claimLink()
+            }
+            .onChange(of: session.pendingLinkToken) { claimLink() }
+            .onChange(of: session.isConnected) { claimLink() }
+            .onChange(of: controlActive) { claimLink() }
             #if DEBUG
             .task {
                 guard await session.applyDebugLaunchArguments(browser) else { return }
@@ -48,6 +67,13 @@ struct BrowserWindow: View {
                 await session.applyDebugSnapshot()
             }
             #endif
+    }
+
+    private func claimLink() {
+        guard awaitingLink || controlActive == .key else { return }
+        guard session.isConnected, let link = session.takePendingLink() else { return }
+        awaitingLink = false
+        browser.apply(link)
     }
 }
 
@@ -104,7 +130,11 @@ struct RootView: View {
     #endif
 
     var body: some View {
-        Group {
+        VStack(spacing: 0) {
+            if let message = session.linkMessage {
+                MessageBar(text: message, symbol: "link") { session.linkMessage = nil }
+                Divider()
+            }
             if session.isConnected {
                 ClusterView()
             } else {

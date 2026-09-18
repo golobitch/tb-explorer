@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Everything else is generated from INFOPLIST_KEY_* build settings and merged on top of
+	     this file. CFBundleURLTypes is an array of dictionaries, which those settings cannot
+	     express, so the URL scheme lives here. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.golobitch.tb-explorer.deeplink</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>tb-explorer</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

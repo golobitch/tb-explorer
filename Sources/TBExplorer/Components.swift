@@ -121,6 +121,30 @@ struct AmountText: View {
     }
 }
 
+/// A dismissible strip explaining something that isn't an error: a lookup that found nothing,
+/// a link waiting for a connection.
+struct MessageBar: View {
+    let text: String
+    var symbol = "questionmark.circle"
+    let dismiss: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Label(text, systemImage: symbol)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+            Spacer()
+            Button(action: dismiss) { Image(systemName: "xmark") }
+                .buttonStyle(.borderless)
+                .help("Dismiss")
+        }
+        .font(.callout)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(.quaternary.opacity(0.4))
+    }
+}
+
 /// Switches amounts between the ledger's currency format and exact integers.
 /// One setting shown in several places, so every screen agrees on what a number means.
 struct CurrencyFormatToggle: View {

@@ -200,18 +200,6 @@ private struct LookupMessageBar: View {
     let dismiss: () -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
-            Label(text, systemImage: "questionmark.circle")
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-            Spacer()
-            Button(action: dismiss) { Image(systemName: "xmark") }
-                .buttonStyle(.borderless)
-                .help("Dismiss")
-        }
-        .font(.callout)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(.quaternary.opacity(0.4))
+        MessageBar(text: text, symbol: "questionmark.circle", dismiss: dismiss)
     }
 }

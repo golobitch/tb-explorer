@@ -15,7 +15,11 @@ import TBKit
 /// - `-TBSearch <id>` / `-TBFilterCode <code>`: prefill the account Transfers tab search or code filter
 /// - `-TBCurrency on|off`: sets the currency-format checkbox
 /// - `-TBFormat "840:2:USD,700:2:EUR"`: ledger overrides for the debug connection, `id:decimals:name`
+/// - `-TBConnectDelay <seconds>`: waits before connecting, leaving time to send a link to the
+///   disconnected app and watch it be applied once the connection comes up
 /// - `-TBWindows <n>`: opens `n` windows onto the same connection
+/// - `-TBLink <url>`: delivers a `tb-explorer://` link as if it had been opened from outside,
+///   and claims it here rather than waiting for the window to become key
 /// - `-TBSettings YES`: opens the Settings window (snapshots then capture it)
 /// - `-TBSnapshot <name>`: after loading, draw the main window to `<name>.png` in the
 ///   app's temporary directory and quit. Needs no Screen Recording permission.
@@ -33,6 +37,8 @@ extension Session {
             defaults.set(currency == "on" || currency == "true" || currency == "1", forKey: "format.currency")
         }
         if let address = defaults.string(forKey: "TBConnect") {
+            let delay = defaults.integer(forKey: "TBConnectDelay")
+            if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
             await debugConnect(address: address)
             applyDebugFormats()
             if isConnected, let target = defaults.string(forKey: "TBOpen") {
@@ -40,6 +46,10 @@ extension Session {
                 for _ in 0..<defaults.integer(forKey: "TBBack") { browser.goBack() }
                 for _ in 0..<defaults.integer(forKey: "TBForward") { browser.goForward() }
             }
+        }
+        if let link = defaults.string(forKey: "TBLink").flatMap(URL.init(string:)) {
+            receive(link)
+            if let claimed = takePendingLink() { browser.apply(claimed) }
         }
         return true
     }

@@ -55,6 +55,8 @@ targets:
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
         INFOPLIST_KEY_NSHumanReadableCopyright: ""
         GENERATE_INFOPLIST_FILE: YES
+        # Merged under the generated keys above; holds only CFBundleURLTypes (tb-explorer://).
+        INFOPLIST_FILE: Sources/TBExplorer/Info.plist
 
   TBKitTests:
     type: bundle.unit-test
