@@ -95,6 +95,16 @@ vendor:
 	rm -f Vendor/tigerbeetle/lib/libtb_client.a
 	lipo -create .bin/tbgo/libtb_client_aarch64.a .bin/tbgo/libtb_client_x86_64.a \
 	  -output Vendor/tigerbeetle/lib/libtb_client.a
+	# Cargo builds one target at a time, so the cli links a per-target archive rather than the
+	# universal one. The macOS slices are the repacked ones; Linux is copied as published.
+	for arch in aarch64 x86_64; do \
+	  mkdir -p Vendor/tigerbeetle/lib/$$arch-macos && \
+	  cp .bin/tbgo/libtb_client_$$arch.a Vendor/tigerbeetle/lib/$$arch-macos/libtb_client.a && \
+	  mkdir -p Vendor/tigerbeetle/lib/$$arch-linux && \
+	  cp .bin/tbgo/github.com/tigerbeetle/tigerbeetle-go@v$(TB_VERSION)/native/libtb_client_$$arch-linux.a \
+	    Vendor/tigerbeetle/lib/$$arch-linux/libtb_client.a || exit 1; \
+	done
+	chmod 644 Vendor/tigerbeetle/lib/*/libtb_client.a
 	echo $(TB_VERSION) > Vendor/tigerbeetle/VERSION
 	rm -rf .bin/tbgo
 
