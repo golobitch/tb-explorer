@@ -5,6 +5,14 @@
 
 pub mod client;
 pub mod ffi;
+pub mod models;
+pub mod queries;
+pub mod wire;
 
 pub use client::{CLIENT_VERSION, Client, DEFAULT_TIMEOUT, TbError};
 pub use ffi::Operation;
+pub use models::{
+    Account, AccountFilter, Balance, DEFAULT_LIMIT, MAX_LIMIT, QueryFilter, Transfer, clamp_limit,
+    next_cursor,
+};
+pub use queries::Found;
