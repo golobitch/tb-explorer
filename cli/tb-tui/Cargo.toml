@@ -9,3 +9,5 @@ repository.workspace = true
 
 [dependencies]
 tbclient.workspace = true
+ratatui = "0.30"
+crossterm = "0.29"
