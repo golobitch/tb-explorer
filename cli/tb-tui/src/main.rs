@@ -12,7 +12,7 @@ use std::time::Duration;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use tbclient::Client;
 
-use crate::app::{App, View};
+use crate::app::{App, Mode, View};
 use crate::worker::Worker;
 
 struct Options {
@@ -94,9 +94,15 @@ fn main() {
     }
 }
 
+/// k9s polls every two seconds; so does this, when asked to.
+const AUTO_REFRESH: Duration = Duration::from_secs(2);
+
 fn run(terminal: &mut ratatui::DefaultTerminal, app: &mut App) -> std::io::Result<()> {
     while !app.quit {
         app.drain();
+        if app.should_auto_refresh(AUTO_REFRESH) {
+            app.reload();
+        }
         terminal.draw(|frame| ui::draw(frame, app))?;
 
         // A short poll keeps answers from the worker arriving promptly without spinning.
@@ -165,13 +171,28 @@ fn handle_key(app: &mut App, key: KeyEvent) {
     if key.modifiers.contains(KeyModifiers::CONTROL) {
         match key.code {
             KeyCode::Char('r') => app.reload(),
+            KeyCode::Char('a') => app.show_commands(),
             KeyCode::Char('c') => app.quit = true,
             _ => {}
         }
         return;
     }
 
+    // While typing, every printable key belongs to the line being typed.
+    if matches!(app.mode, Mode::Command | Mode::Filter) {
+        match key.code {
+            KeyCode::Esc => app.cancel_input(),
+            KeyCode::Enter => app.submit_input(),
+            KeyCode::Backspace => app.backspace(),
+            KeyCode::Char(c) => app.type_char(c),
+            _ => {}
+        }
+        return;
+    }
+
     match key.code {
+        KeyCode::Char(':') => app.begin_command(),
+        KeyCode::Char('/') => app.begin_filter(),
         KeyCode::Char('q') => app.quit = true,
         KeyCode::Char('?') => app.toggle_help(),
         KeyCode::Esc => app.back(),
@@ -185,6 +206,7 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         KeyCode::Char('o') => app.toggle_order(),
         KeyCode::Enter => app.open_selection(),
         KeyCode::Char('b') => app.toggle_balances(),
+        KeyCode::Char('a') => app.toggle_auto_refresh(),
         _ => {}
     }
 }

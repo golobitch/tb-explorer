@@ -58,7 +58,25 @@ pub enum Mode {
     #[default]
     Normal,
     Help,
+    /// `:` — ask the cluster something new.
+    Command,
+    /// `/` — narrow what is already on screen.
+    Filter,
+    /// `ctrl-a` — every command, for when you cannot remember one.
+    Commands,
 }
+
+/// What `:` understands. Aliases are listed because a command you cannot remember is a command you
+/// do not have; `ctrl-a` shows this table.
+pub const COMMANDS: &[(&str, &str, &str)] = &[
+    ("accounts", "acc, a", "every account"),
+    ("transfers", "tx, t", "every transfer"),
+    ("ledgers", "l", "ledgers seen so far"),
+    ("account <id>", "acc <id>", "one account's transfers"),
+    ("balances <id>", "bal <id>", "one account's balance history"),
+    ("transfer <id>", "tx <id>", "one transfer and its chain"),
+    ("<id>", "", "whichever of the two that id names"),
+];
 
 /// The rows behind the current view.
 #[derive(Debug, Default)]
@@ -69,22 +87,6 @@ pub enum Rows {
     Transfers(Vec<Transfer>),
     Balances(Vec<Balance>),
     Ledgers(Vec<u32>),
-}
-
-impl Rows {
-    pub fn len(&self) -> usize {
-        match self {
-            Self::None => 0,
-            Self::Accounts(rows) => rows.len(),
-            Self::Transfers(rows) => rows.len(),
-            Self::Balances(rows) => rows.len(),
-            Self::Ledgers(rows) => rows.len(),
-        }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
 }
 
 pub struct App {
@@ -105,6 +107,12 @@ pub struct App {
     /// the same approach the macOS app takes.
     pub ledgers: Vec<u32>,
     pub newest_first: bool,
+    /// Re-runs the current query on a timer. Paused while a row is selected or a detail view is
+    /// open: a list that moves under the cursor is the one thing that makes k9s unpleasant, and
+    /// this is a tool for reading carefully.
+    pub auto_refresh: bool,
+    pub input: String,
+    pub filter: String,
     pub quit: bool,
     worker: Worker,
     last_refresh: Instant,
@@ -127,6 +135,9 @@ impl App {
             loading: false,
             ledgers: Vec::new(),
             newest_first: false,
+            auto_refresh: false,
+            input: String::new(),
+            filter: String::new(),
             quit: false,
             worker,
             last_refresh: Instant::now(),
@@ -202,13 +213,16 @@ impl App {
     /// Opens whatever the selected row points at: an account from a list of accounts, a transfer
     /// from a list of transfers, a ledger's accounts from the ledger list.
     pub fn open_selection(&mut self) {
+        let Some(row) = self.selected_row() else {
+            return;
+        };
         let next = match &self.rows {
-            Rows::Accounts(rows) => rows.get(self.selected).map(|a| View::Account {
+            Rows::Accounts(rows) => rows.get(row).map(|a| View::Account {
                 id: a.id,
                 balances: false,
             }),
-            Rows::Transfers(rows) => rows.get(self.selected).map(|t| View::Transfer { id: t.id }),
-            Rows::Ledgers(rows) => rows.get(self.selected).map(|_| View::Accounts),
+            Rows::Transfers(rows) => rows.get(row).map(|t| View::Transfer { id: t.id }),
+            Rows::Ledgers(rows) => rows.get(row).map(|_| View::Accounts),
             _ => None,
         };
         if let Some(next) = next {
@@ -310,8 +324,17 @@ impl App {
         self.ledgers.sort_unstable();
     }
 
+    pub fn visible_len(&self) -> usize {
+        self.visible_rows().len()
+    }
+
+    /// The index into `rows` behind the current selection, once the filter has had its say.
+    pub fn selected_row(&self) -> Option<usize> {
+        self.visible_rows().get(self.selected).copied()
+    }
+
     fn clamp_selection(&mut self) {
-        let len = self.rows.len();
+        let len = self.visible_len();
         if len == 0 {
             self.selected = 0;
         } else if self.selected >= len {
@@ -320,8 +343,9 @@ impl App {
     }
 
     pub fn select_next(&mut self) {
-        if !self.rows.is_empty() {
-            self.selected = (self.selected + 1).min(self.rows.len() - 1);
+        let len = self.visible_len();
+        if len > 0 {
+            self.selected = (self.selected + 1).min(len - 1);
         }
     }
 
@@ -334,7 +358,7 @@ impl App {
     }
 
     pub fn select_last(&mut self) {
-        self.selected = self.rows.len().saturating_sub(1);
+        self.selected = self.visible_len().saturating_sub(1);
     }
 
     pub fn toggle_help(&mut self) {
@@ -347,7 +371,8 @@ impl App {
     /// `esc`: out of help first, then back to the list. One rule, one key.
     pub fn back(&mut self) {
         match self.mode {
-            Mode::Help => self.mode = Mode::Normal,
+            Mode::Help | Mode::Commands => self.mode = Mode::Normal,
+            Mode::Command | Mode::Filter => self.cancel_input(),
             Mode::Normal => {
                 if self.status.is_some() || self.error.is_some() {
                     self.status = None;
@@ -366,6 +391,143 @@ impl App {
     pub fn toggle_order(&mut self) {
         self.newest_first = !self.newest_first;
         self.reload();
+    }
+
+    pub fn begin_command(&mut self) {
+        self.mode = Mode::Command;
+        self.input.clear();
+    }
+
+    pub fn begin_filter(&mut self) {
+        self.mode = Mode::Filter;
+        self.input = self.filter.clone();
+    }
+
+    pub fn show_commands(&mut self) {
+        self.mode = Mode::Commands;
+    }
+
+    pub fn type_char(&mut self, c: char) {
+        self.input.push(c);
+        if self.mode == Mode::Filter {
+            self.filter = self.input.clone();
+            self.selected = 0;
+        }
+    }
+
+    pub fn backspace(&mut self) {
+        self.input.pop();
+        if self.mode == Mode::Filter {
+            self.filter = self.input.clone();
+            self.selected = 0;
+        }
+    }
+
+    pub fn cancel_input(&mut self) {
+        if self.mode == Mode::Filter {
+            self.filter.clear();
+        }
+        self.input.clear();
+        self.mode = Mode::Normal;
+    }
+
+    /// Runs what was typed after `:`. An unknown command says so rather than doing nothing.
+    pub fn submit_input(&mut self) {
+        let typed = self.input.trim().to_string();
+        self.input.clear();
+        let mode = std::mem::take(&mut self.mode);
+        if mode == Mode::Filter || typed.is_empty() {
+            return;
+        }
+
+        let mut words = typed.split_whitespace();
+        let command = words.next().unwrap_or_default();
+        let argument = words.next().and_then(|a| a.parse::<u128>().ok());
+
+        match (command, argument) {
+            ("accounts" | "acc" | "a", None) => self.show(View::Accounts),
+            ("transfers" | "tx" | "t", None) => self.show(View::Transfers),
+            ("ledgers" | "l", None) => self.show(View::Ledgers),
+            ("account" | "acc" | "a", Some(id)) => self.push(View::Account {
+                id,
+                balances: false,
+            }),
+            ("balances" | "bal", Some(id)) => self.push(View::Account { id, balances: true }),
+            ("transfer" | "tx" | "t", Some(id)) => self.push(View::Transfer { id }),
+            ("help" | "h" | "?", _) => self.mode = Mode::Help,
+            ("q" | "quit", _) => self.quit = true,
+            _ => match command.parse::<u128>() {
+                // A bare id is the commonest thing to paste, so it needs no command at all.
+                Ok(id) => {
+                    self.loading = true;
+                    self.worker.send(Query::Lookup { id });
+                }
+                Err(_) => self.status = Some(format!("no command “{typed}” — ctrl-a lists them")),
+            },
+        }
+    }
+
+    /// The rows left after `/`. Filtering happens here rather than at the cluster because
+    /// TigerBeetle only filters on the fields its query filters carry.
+    pub fn visible_rows(&self) -> Vec<usize> {
+        let needle = self.filter.trim().to_lowercase();
+        let matches =
+            |haystack: String| needle.is_empty() || haystack.to_lowercase().contains(&needle);
+        match &self.rows {
+            Rows::Accounts(rows) => rows
+                .iter()
+                .enumerate()
+                .filter(|(_, a)| {
+                    matches(format!(
+                        "{} {} {} {}",
+                        a.id,
+                        a.ledger,
+                        a.code,
+                        a.flag_names().join(" ")
+                    ))
+                })
+                .map(|(i, _)| i)
+                .collect(),
+            Rows::Transfers(rows) => rows
+                .iter()
+                .enumerate()
+                .filter(|(_, t)| {
+                    matches(format!(
+                        "{} {} {} {} {} {} {}",
+                        t.id,
+                        t.debit_account_id,
+                        t.credit_account_id,
+                        t.amount,
+                        t.ledger,
+                        t.code,
+                        t.flag_names().join(" ")
+                    ))
+                })
+                .map(|(i, _)| i)
+                .collect(),
+            Rows::Balances(rows) => (0..rows.len()).collect(),
+            Rows::Ledgers(rows) => rows
+                .iter()
+                .enumerate()
+                .filter(|(_, l)| matches(l.to_string()))
+                .map(|(i, _)| i)
+                .collect(),
+            Rows::None => Vec::new(),
+        }
+    }
+
+    pub fn toggle_auto_refresh(&mut self) {
+        self.auto_refresh = !self.auto_refresh;
+        self.last_refresh = Instant::now();
+    }
+
+    /// True when the timer is due and nothing is being read closely.
+    pub fn should_auto_refresh(&self, every: Duration) -> bool {
+        self.auto_refresh
+            && self.mode == Mode::Normal
+            && self.selected == 0
+            && self.stack.is_empty()
+            && self.last_refresh.elapsed() >= every
     }
 
     /// Where you are, and how you got here.

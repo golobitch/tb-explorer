@@ -6,7 +6,7 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph, Row, Table, TableState};
 
-use crate::app::{App, Mode, Rows, View};
+use crate::app::{App, COMMANDS, Mode, Rows, View};
 
 pub const KEYS: &[(&str, &str)] = &[
     ("1", "accounts"),
@@ -17,7 +17,11 @@ pub const KEYS: &[(&str, &str)] = &[
     ("enter", "open the selected row"),
     ("b", "balances, on an account"),
     ("o", "newest first"),
+    (":", "command — ask the cluster"),
+    ("/", "filter — narrow what is shown"),
+    ("ctrl-a", "list every command"),
     ("ctrl-r", "refresh"),
+    ("a", "auto-refresh every 2s"),
     ("esc", "back"),
     ("?", "this help"),
     ("q", "quit"),
@@ -35,8 +39,10 @@ pub fn draw(frame: &mut Frame, app: &App) {
     draw_body(frame, body, app);
     draw_footer(frame, footer, app);
 
-    if app.mode == Mode::Help {
-        draw_help(frame, frame.area());
+    match app.mode {
+        Mode::Help => draw_help(frame, frame.area()),
+        Mode::Commands => draw_commands(frame, frame.area()),
+        _ => {}
     }
 }
 
@@ -127,9 +133,12 @@ fn draw_body(frame: &mut Frame, area: Rect, app: &App) {
         return;
     }
 
-    if app.rows.is_empty() {
+    let visible = app.visible_rows();
+    if visible.is_empty() {
         let text = if app.loading {
             "loading…"
+        } else if !app.filter.is_empty() {
+            "nothing matches this filter"
         } else {
             "nothing here"
         };
@@ -164,7 +173,7 @@ fn draw_body(frame: &mut Frame, area: Rect, app: &App) {
                 "flags",
             ])
             .style(Style::new().fg(Color::DarkGray));
-            let body = rows.iter().map(|a| {
+            let body = visible.iter().filter_map(|&i| rows.get(i)).map(|a| {
                 let (net, negative) = a.net_posted();
                 Row::new(vec![
                     a.id.to_string(),
@@ -202,7 +211,7 @@ fn draw_body(frame: &mut Frame, area: Rect, app: &App) {
                 "id", "debit", "credit", "amount", "ledger", "code", "flags",
             ])
             .style(Style::new().fg(Color::DarkGray));
-            let body = rows.iter().map(|t| {
+            let body = visible.iter().filter_map(|&i| rows.get(i)).map(|t| {
                 Row::new(vec![
                     t.id.to_string(),
                     t.debit_account_id.to_string(),
@@ -231,7 +240,7 @@ fn draw_body(frame: &mut Frame, area: Rect, app: &App) {
                 "credits posted",
             ])
             .style(Style::new().fg(Color::DarkGray));
-            let body = rows.iter().map(|b| {
+            let body = visible.iter().filter_map(|&i| rows.get(i)).map(|b| {
                 Row::new(vec![
                     b.timestamp.to_string(),
                     b.debits_pending.to_string(),
@@ -250,7 +259,10 @@ fn draw_body(frame: &mut Frame, area: Rect, app: &App) {
         }
         Rows::Ledgers(rows) => {
             let header = Row::new(vec!["ledger"]).style(Style::new().fg(Color::DarkGray));
-            let body = rows.iter().map(|l| Row::new(vec![l.to_string()]));
+            let body = visible
+                .iter()
+                .filter_map(|&i| rows.get(i))
+                .map(|l| Row::new(vec![l.to_string()]));
             frame.render_stateful_widget(
                 Table::new(body, [Constraint::Length(12)])
                     .header(header)
@@ -264,7 +276,31 @@ fn draw_body(frame: &mut Frame, area: Rect, app: &App) {
 }
 
 fn draw_footer(frame: &mut Frame, area: Rect, app: &App) {
-    let count = app.rows.len();
+    if matches!(app.mode, Mode::Command | Mode::Filter) {
+        let (prompt, colour) = match app.mode {
+            Mode::Command => (":", Color::Cyan),
+            _ => ("/", Color::Yellow),
+        };
+        frame.render_widget(
+            Paragraph::new(Line::from(vec![
+                Span::styled(prompt, Style::new().fg(colour).add_modifier(Modifier::BOLD)),
+                Span::raw(app.input.clone()),
+                Span::styled("▏", Style::new().fg(colour)),
+                Span::styled(
+                    if app.mode == Mode::Command {
+                        "   enter runs it · ctrl-a lists commands · esc cancels"
+                    } else {
+                        "   filters the rows on screen · esc clears"
+                    },
+                    Style::new().fg(Color::DarkGray),
+                ),
+            ])),
+            area,
+        );
+        return;
+    }
+
+    let count = app.visible_len();
     let noun = match (&app.view, &app.rows) {
         (_, Rows::Balances(_)) => "balances",
         (_, Rows::Ledgers(_)) => "ledgers",
@@ -281,6 +317,15 @@ fn draw_footer(frame: &mut Frame, area: Rect, app: &App) {
     if app.loading {
         spans.push(Span::styled("  loading…", Style::new().fg(Color::Yellow)));
     }
+    if !app.filter.is_empty() {
+        spans.push(Span::styled(
+            format!("  /{}", app.filter),
+            Style::new().fg(Color::Yellow),
+        ));
+    }
+    if app.auto_refresh {
+        spans.push(Span::styled("  auto 2s", Style::new().fg(Color::Green)));
+    }
     if let Some(status) = &app.status {
         spans.push(Span::raw("  "));
         spans.push(Span::styled(status.clone(), Style::new().fg(Color::Yellow)));
@@ -294,7 +339,7 @@ fn draw_footer(frame: &mut Frame, area: Rect, app: &App) {
 }
 
 fn draw_help(frame: &mut Frame, area: Rect) {
-    let width = 44u16.min(area.width.saturating_sub(4));
+    let width = 54u16.min(area.width.saturating_sub(4));
     let height = (KEYS.len() as u16 + 4).min(area.height.saturating_sub(2));
     let x = area.x + (area.width.saturating_sub(width)) / 2;
     let y = area.y + (area.height.saturating_sub(height)) / 2;
@@ -323,6 +368,44 @@ fn draw_help(frame: &mut Frame, area: Rect) {
     frame.render_widget(Clear, panel);
     frame.render_widget(
         Paragraph::new(lines).block(Block::default().borders(Borders::ALL).title(" keys ")),
+        panel,
+    );
+}
+
+/// `ctrl-a`: every command and its aliases. k9s's best idea — a command you cannot remember is a
+/// command you do not have.
+fn draw_commands(frame: &mut Frame, area: Rect) {
+    let width = 64u16.min(area.width.saturating_sub(4));
+    let height = (COMMANDS.len() as u16 + 4).min(area.height.saturating_sub(2));
+    let panel = Rect {
+        x: area.x + (area.width.saturating_sub(width)) / 2,
+        y: area.y + (area.height.saturating_sub(height)) / 2,
+        width,
+        height,
+    };
+
+    let mut lines = vec![Line::from(vec![
+        Span::styled(
+            format!("  {:<16}", "command"),
+            Style::new().fg(Color::DarkGray),
+        ),
+        Span::styled(
+            format!("{:<12}", "aliases"),
+            Style::new().fg(Color::DarkGray),
+        ),
+        Span::styled("what it opens", Style::new().fg(Color::DarkGray)),
+    ])];
+    lines.extend(COMMANDS.iter().map(|(command, aliases, what)| {
+        Line::from(vec![
+            Span::styled(format!("  {command:<16}"), Style::new().fg(Color::Cyan)),
+            Span::styled(format!("{aliases:<12}"), Style::new().fg(Color::DarkGray)),
+            Span::raw(*what),
+        ])
+    }));
+
+    frame.render_widget(Clear, panel);
+    frame.render_widget(
+        Paragraph::new(lines).block(Block::default().borders(Borders::ALL).title(" : commands ")),
         panel,
     );
 }

@@ -273,3 +273,187 @@ fn a_top_level_view_clears_the_trail() {
     );
     assert_eq!(app.breadcrumbs(), "transfers");
 }
+
+fn type_line(app: &mut App, text: &str) {
+    for c in text.chars() {
+        app.type_char(c);
+    }
+    app.submit_input();
+}
+
+#[test]
+fn commands_open_views_by_name_and_by_alias() {
+    let mut app = app();
+    app.begin_command();
+    type_line(&mut app, "transfers");
+    assert_eq!(app.view, View::Transfers);
+
+    app.begin_command();
+    type_line(&mut app, "acc");
+    assert_eq!(app.view, View::Accounts);
+
+    app.begin_command();
+    type_line(&mut app, "tx 100539");
+    assert_eq!(app.view, View::Transfer { id: 100_539 });
+
+    app.begin_command();
+    type_line(&mut app, "bal 1017");
+    assert_eq!(
+        app.view,
+        View::Account {
+            id: 1017,
+            balances: true
+        }
+    );
+}
+
+#[test]
+fn an_unknown_command_says_so_rather_than_doing_nothing() {
+    let mut app = app();
+    app.begin_command();
+    type_line(&mut app, "nonsense");
+    let status = app.status.clone().expect("a message");
+    assert!(status.contains("nonsense"), "{status}");
+    assert!(status.contains("ctrl-a"), "it points at the list: {status}");
+    assert_eq!(app.view, View::Accounts, "and it changes nothing");
+}
+
+#[test]
+fn esc_cancels_a_half_typed_command() {
+    let mut app = app();
+    app.begin_command();
+    app.type_char('t');
+    app.back();
+    assert_eq!(app.mode, Mode::Normal);
+    assert!(app.input.is_empty());
+    assert_eq!(app.view, View::Accounts);
+}
+
+#[test]
+fn the_filter_narrows_the_rows_on_screen() {
+    let mut app = app();
+    app.rows = Rows::Accounts(vec![
+        Account {
+            id: 1001,
+            ledger: 700,
+            ..Default::default()
+        },
+        Account {
+            id: 1015,
+            ledger: 840,
+            ..Default::default()
+        },
+        Account {
+            id: 1016,
+            ledger: 840,
+            ..Default::default()
+        },
+    ]);
+
+    app.begin_filter();
+    for c in "840".chars() {
+        app.type_char(c);
+    }
+    assert_eq!(app.visible_len(), 2);
+
+    let screen = render(&app, 120, 10);
+    assert!(screen.contains("1015"), "{screen}");
+    assert!(
+        !screen.contains("1001"),
+        "the filtered-out row is gone:\n{screen}"
+    );
+
+    app.backspace();
+    app.backspace();
+    app.backspace();
+    assert_eq!(
+        app.visible_len(),
+        3,
+        "an empty filter shows everything again"
+    );
+}
+
+#[test]
+fn a_filter_that_matches_nothing_says_which_kind_of_empty_it_is() {
+    let mut app = app();
+    app.loading = false;
+    app.rows = Rows::Accounts(vec![Account {
+        id: 1001,
+        ..Default::default()
+    }]);
+    app.begin_filter();
+    type_line(&mut app, "zzz");
+    assert!(render(&app, 100, 8).contains("nothing matches this filter"));
+}
+
+#[test]
+fn opening_a_filtered_row_opens_the_row_you_can_see() {
+    let mut app = app();
+    app.rows = Rows::Accounts(vec![
+        Account {
+            id: 1001,
+            ledger: 700,
+            ..Default::default()
+        },
+        Account {
+            id: 1015,
+            ledger: 840,
+            ..Default::default()
+        },
+    ]);
+    app.begin_filter();
+    for c in "840".chars() {
+        app.type_char(c);
+    }
+    app.mode = Mode::Normal;
+    app.open_selection();
+    assert_eq!(
+        app.view,
+        View::Account {
+            id: 1015,
+            balances: false
+        },
+        "the first visible row, not the first row"
+    );
+}
+
+#[test]
+fn ctrl_a_lists_every_command() {
+    let mut app = app();
+    app.show_commands();
+    let screen = render(&app, 100, 24);
+    for (command, _, _) in crate::app::COMMANDS {
+        let head = command.split_whitespace().next().unwrap();
+        assert!(screen.contains(head), "{command} missing:\n{screen}");
+    }
+}
+
+#[test]
+fn auto_refresh_holds_still_while_something_is_being_read() {
+    use std::time::Duration;
+    let mut app = app();
+    app.toggle_auto_refresh();
+    assert!(app.auto_refresh);
+
+    // Zero interval, so only the guards decide.
+    let due = Duration::from_millis(0);
+    assert!(
+        app.should_auto_refresh(due),
+        "at the top of a list it may refresh"
+    );
+
+    app.rows = Rows::Accounts(vec![Account::default(), Account::default()]);
+    app.select_next();
+    assert!(!app.should_auto_refresh(due), "not while a row is selected");
+
+    app.select_first();
+    app.stack.push(View::Accounts);
+    assert!(
+        !app.should_auto_refresh(due),
+        "not while a detail view is open"
+    );
+
+    app.stack.clear();
+    app.begin_filter();
+    assert!(!app.should_auto_refresh(due), "not while typing");
+}
