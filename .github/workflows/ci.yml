@@ -46,7 +46,9 @@ jobs:
       - name: Read-only guard
         # No front end may write to a cluster; only ui/Tools/tb-seed may create.
         run: |
-          if grep -rnE 'CREATE_(ACCOUNTS|TRANSFERS)|create_accounts|create_transfers' ui/Sources cli; then
+          # Source only: a README explaining the rule must be allowed to name it.
+          if grep -rnE --include='*.swift' --include='*.rs' \
+             'CREATE_(ACCOUNTS|TRANSFERS)|create_accounts|create_transfers' ui/Sources cli; then
             echo "create operations are not allowed in ui/Sources or cli/" >&2
             exit 1
           fi

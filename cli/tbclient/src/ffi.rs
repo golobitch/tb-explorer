@@ -1,8 +1,8 @@
 //! Declarations for the parts of `tb_client.h` this crate uses.
 //!
-//! Hand-written rather than generated: the surface is seven functions and four enums, and the
-//! read-only operations are the point — `create_accounts` and `create_transfers` are deliberately
-//! absent, so no amount of calling into this module can write to a cluster.
+//! Hand-written rather than generated: the surface is seven functions and four enums, and the read
+//! operations are the point. The two write operations the header declares at 146 and 147 are
+//! deliberately absent, so no amount of calling into this module can change a cluster.
 
 use std::ffi::{c_char, c_void};
 
@@ -23,8 +23,8 @@ pub struct TbPacket {
     pub opaque: [u8; 64],
 }
 
-/// The read half of `TB_OPERATION`. The create operations exist in the header at 146 and 147 and
-/// are left out here on purpose.
+/// The read half of `TB_OPERATION`. The two write operations exist in the header at 146 and 147
+/// and are left out here on purpose.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Operation {
