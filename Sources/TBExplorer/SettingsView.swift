@@ -2,16 +2,35 @@ import SwiftUI
 import TBKit
 
 struct SettingsView: View {
+    /// `-TBSettingsTab` picks the pane for screenshots; ⌘, opens General.
+    @State private var tab = Tab.general
+
+    enum Tab: String { case general, formats }
+
     var body: some View {
-        FormatsSettings()
-            .frame(width: 620, height: 470)
+        TabView(selection: $tab) {
+            GeneralSettings()
+                .tabItem { Label("General", systemImage: "gearshape") }
+                .tag(Tab.general)
+            FormatsSettings()
+                .tabItem { Label("Formats", systemImage: "dollarsign.circle") }
+                .tag(Tab.formats)
+        }
+        .frame(width: 620, height: 470)
+        #if DEBUG
+        .task {
+            if let name = UserDefaults.standard.string(forKey: "TBSettingsTab"),
+               let requested = Tab(rawValue: name) {
+                tab = requested
+            }
+        }
+        #endif
     }
 }
 
 /// How amounts, ledgers and codes read: the currency switch, per-ledger overrides and code labels.
 /// Overrides are stored per connection, so this pane needs a live connection to edit anything.
-private struct FormatsSettings: View {
-    // Rendered directly by `SettingsView`; a `TabView` returns when a second pane exists.
+struct FormatsSettings: View {
     @Environment(Session.self) private var session
     @AppStorage("format.currency") private var currencyFormat = true
 

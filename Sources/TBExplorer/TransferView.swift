@@ -7,7 +7,10 @@ struct TransferView: View {
     @Environment(Browser.self) private var browser
     @State private var chain: Chain?
     @State private var error: Error?
-    @State private var lookback = TBClient.defaultLookback
+    /// 0 follows the Settings value; Search Wider pins a larger one for this screen.
+    @State private var lookback: UInt32 = 0
+
+    private var effectiveLookback: UInt32 { lookback == 0 ? AppSettings.lookback : lookback }
     @State private var isLoading = false
     @State private var showRaw = false
     @AppStorage("format.currency") private var currencyFormat = true
@@ -19,8 +22,10 @@ struct TransferView: View {
             if let chain {
                 Form {
                     TransferSections(transfer: chain.transfer, style: style)
-                    ChainSections(chain: chain, style: style, lookback: lookback, isLoading: isLoading) {
-                        lookback = min(lookback * 10, TBClient.maxLookback)
+                    ChainSections(
+                        chain: chain, style: style, lookback: effectiveLookback, isLoading: isLoading
+                    ) {
+                        lookback = min(effectiveLookback * 10, TBClient.maxLookback)
                     }
                     Section("Raw") {
                         DisclosureGroup("All Fields", isExpanded: $showRaw) {
@@ -62,7 +67,7 @@ struct TransferView: View {
                     .keyboardShortcut("r")
             }
         }
-        .task(id: "\(transferID)/\(lookback)") { await load() }
+        .task(id: "\(transferID)/\(effectiveLookback)") { await load() }
     }
 
     private func subtitle(for transfer: Transfer) -> String {
@@ -73,7 +78,7 @@ struct TransferView: View {
         guard let client = session.client else { return }
         isLoading = true
         do {
-            let c = try await client.chain(for: transferID, lookback: lookback)
+            let c = try await client.chain(for: transferID, lookback: effectiveLookback)
             chain = c
             error = nil
             session.observe([c.transfer] + c.linked + (c.pending.map { [$0] } ?? []))

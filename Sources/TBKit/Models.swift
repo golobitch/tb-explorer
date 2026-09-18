@@ -100,7 +100,8 @@ public struct Balance: Identifiable, Hashable, Sendable {
 public let tbMaxLimit: UInt32 = 8000
 public let tbDefaultLimit: UInt32 = 100
 
-func clampLimit(_ l: UInt32) -> UInt32 {
+/// `0` means "unset, use the default"; anything above the cap is clamped to it.
+public func clampLimit(_ l: UInt32) -> UInt32 {
     l == 0 ? tbDefaultLimit : min(l, tbMaxLimit)
 }
 

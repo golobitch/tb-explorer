@@ -41,6 +41,9 @@ final class Session {
     /// Explains why a link is waiting, or why it was refused.
     var linkMessage: String?
 
+    /// Startup applies to the app, not to each window.
+    private var startupApplied = false
+
     #if DEBUG
     /// `applyDebugLaunchArguments` runs from a window's task, and there can be several windows.
     var debugArgumentsApplied = false
@@ -111,6 +114,33 @@ final class Session {
         guard let client, var info else { return }
         info.latency = try await client.ping()
         self.info = info
+    }
+
+    /// Connects at launch if the user asked for that, and answers with the location to reopen.
+    /// Only ever connects to a saved connection the user chose in Settings.
+    func applyStartup() async -> DeepLink? {
+        guard !startupApplied else { return nil }
+        startupApplied = true
+
+        let defaults = UserDefaults.standard
+        let mode = defaults.string(forKey: AppSettings.startupModeKey).flatMap(StartupMode.init)
+        switch mode {
+        case .lastUsed:
+            if let saved = store.connections.first { try? await connect(saved) }
+        case .specific:
+            let id = defaults.string(forKey: AppSettings.startupConnectionKey) ?? ""
+            if let saved = store.connections.first(where: { $0.id.uuidString == id }) {
+                try? await connect(saved)
+            }
+        case .ask, nil:
+            break
+        }
+
+        guard isConnected, defaults.bool(forKey: AppSettings.restoreLocationKey),
+              let string = defaults.string(forKey: AppSettings.lastLocationKey),
+              let url = URL(string: string)
+        else { return nil }
+        return DeepLink(url)
     }
 
     /// Parks an incoming link. Never connects, never navigates.

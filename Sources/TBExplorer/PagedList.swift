@@ -87,7 +87,10 @@ struct AccountTransfersSource: PageSource {
 @MainActor
 @Observable
 final class PagedList<Item: Timestamped> {
-    let pageSize: UInt32
+    /// nil follows the user's Rows per Page setting; a caller can pin its own size instead.
+    var pageSizeOverride: UInt32?
+
+    var pageSize: UInt32 { pageSizeOverride ?? AppSettings.rowsPerPage }
     private(set) var items: [Item] = []
     private(set) var isLoading = false
     private(set) var hasMore = true
@@ -97,8 +100,8 @@ final class PagedList<Item: Timestamped> {
     private var reversed: Bool
     private var generation = 0
 
-    init(pageSize: UInt32 = tbDefaultLimit) {
-        self.pageSize = pageSize
+    init(pageSize: UInt32? = nil) {
+        self.pageSizeOverride = pageSize
         self.source = EmptySource<Item>()
         self.reversed = false
     }
@@ -128,11 +131,14 @@ final class PagedList<Item: Timestamped> {
             let next = Cursor.next(after: last.timestamp, reversed: reversed)
             cursor = (next.min ?? 0, next.max ?? 0)
         }
+        // Read once: the setting can change between pages, and comparing a page fetched at one
+        // limit against another would end the list early.
+        let limit = pageSize
         do {
-            let page = try await source.page(timestampMin: cursor.min, timestampMax: cursor.max, limit: pageSize)
+            let page = try await source.page(timestampMin: cursor.min, timestampMax: cursor.max, limit: limit)
             guard gen == generation else { return }
             items.append(contentsOf: page)
-            hasMore = page.count == Int(pageSize)
+            hasMore = page.count == Int(limit)
         } catch {
             guard gen == generation else { return }
             self.error = error

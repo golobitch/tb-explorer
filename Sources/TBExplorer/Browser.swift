@@ -61,21 +61,25 @@ final class Browser {
         if case .ledger(let l) = item { session.observe(ledger: l) }
         sidebar = item
         history.reset()
+        rememberLocation()
     }
 
     func open(_ route: Route) {
         seenToken = session.connectionToken
         if case .ledger(let l) = route { session.observe(ledger: l) }
         history.push(route)
+        rememberLocation()
     }
 
     func goBack() {
         history.back()
+        rememberLocation()
     }
 
     func goForward() {
         history.forwardOne()
         if case .ledger(let l)? = history.stack.last { session.observe(ledger: l) }
+        rememberLocation()
     }
 
     /// Clears this window's navigation, e.g. when the cluster underneath it changes.
@@ -104,6 +108,41 @@ final class Browser {
         case .account(let id): .account(id)
         case .transfer(let id): .transfer(id)
         }
+    }
+
+    /// Records where this window is, for "Reopen the last location". The most recent navigation
+    /// in any window wins, which is what "where you left off" means with several open.
+    private func rememberLocation() {
+        guard UserDefaults.standard.bool(forKey: AppSettings.restoreLocationKey) else { return }
+        let here = history.stack.last.map(link) ?? sidebarLink
+        UserDefaults.standard.set(here.url().absoluteString, forKey: AppSettings.lastLocationKey)
+    }
+
+    private var sidebarLink: DeepLink {
+        switch sidebar ?? .overview {
+        case .overview: .overview
+        case .search: .search
+        case .accounts: .accounts
+        case .transfers: .transfers
+        case .ledger(let l): .ledger(l)
+        }
+    }
+
+    /// Reopens a remembered location, skipping quietly if what it names is gone — a failed
+    /// lookup on launch reads like a bug, and this is a convenience, not a promise.
+    func restore(_ link: DeepLink) async {
+        switch link {
+        case .account(let id):
+            guard let client = session.client,
+                  let account = try? await client.lookupAccounts([id]), !account.isEmpty
+            else { return }
+        case .transfer(let id):
+            guard let client = session.client,
+                  let transfer = try? await client.lookupTransfers([id]), !transfer.isEmpty
+            else { return }
+        default: break
+        }
+        apply(link)
     }
 
     /// Navigates to the place a link names.

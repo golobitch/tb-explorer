@@ -46,6 +46,9 @@ struct BrowserWindow: View {
     var body: some View {
         RootView()
             .environment(browser)
+            .task {
+                if let location = await session.applyStartup() { await browser.restore(location) }
+            }
             // Publishes this window's browser to the menu commands while it is focused.
             .focusedSceneValue(browser)
             // A link is parked on the session; the key window claims it, so exactly one window
