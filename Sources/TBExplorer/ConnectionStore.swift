@@ -22,8 +22,7 @@ final class ConnectionStore {
     private let url: URL
 
     init() {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        url = base.appending(path: "tb-explorer/connections.json")
+        url = AppStorageLocation.url(for: "connections.json")
         load()
     }
 
@@ -61,21 +60,4 @@ final class ConnectionStore {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try JSONEncoder.store.encode(connections).write(to: url, options: .atomic)
     }
-}
-
-private extension JSONEncoder {
-    static let store: JSONEncoder = {
-        let e = JSONEncoder()
-        e.outputFormatting = [.prettyPrinted, .sortedKeys]
-        e.dateEncodingStrategy = .iso8601
-        return e
-    }()
-}
-
-private extension JSONDecoder {
-    static let store: JSONDecoder = {
-        let d = JSONDecoder()
-        d.dateDecodingStrategy = .iso8601
-        return d
-    }()
 }
