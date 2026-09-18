@@ -55,8 +55,11 @@ struct DeepLinkTests {
         #expect(parse("tb-explorer://account/0xff") == .account(255))
     }
 
-    @Test func acceptsASchemeOnlyForm() {
-        #expect(parse("tb-explorer:transfer/100539") == .transfer(100_539))
+    /// The parser also reads `tb-explorer:transfer/100539`, but that spelling is not asserted:
+    /// whether `URL(string:)` accepts it, and where it puts the first segment, varies by
+    /// Foundation version. Everything the app produces and macOS delivers uses `//`.
+    @Test func ignoresSchemeCase() {
+        #expect(parse("TB-EXPLORER://Transfer/100539") == .transfer(100_539))
     }
 
     @Test func rejectsAnythingElse() {

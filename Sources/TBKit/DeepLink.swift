@@ -20,18 +20,27 @@ public enum DeepLink: Equatable, Sendable {
     public init?(_ url: URL, cluster: inout UInt128?) {
         guard url.scheme?.lowercased() == Self.scheme else { return nil }
 
-        // `tb-explorer://transfer/100539` puts "transfer" in the host and "/100539" in the path,
-        // while `tb-explorer:transfer/100539` puts both in the path.
-        var parts = [url.host()].compactMap { $0 }
-        parts += url.pathComponents.filter { $0 != "/" }
-        guard let kind = parts.first?.lowercased() else { return nil }
-        let argument = parts.count > 1 ? parts[1] : nil
+        // Read the location out of the string rather than from `host` and `pathComponents`:
+        // Foundation versions disagree about whether the first segment of
+        // `tb-explorer:transfer/100539` is a host or the start of the path, and this grammar is
+        // small enough that the disagreement is not worth inheriting.
+        var rest = Substring(url.absoluteString).dropFirst(Self.scheme.count + 1)
+        if rest.hasPrefix("//") { rest = rest.dropFirst(2) }
 
-        if let raw = URLComponents(url: url, resolvingAgainstBaseURL: false)?
-            .queryItems?.first(where: { $0.name == "cluster" })?.value {
-            guard let parsed = UInt128(tbString: raw) else { return nil }
+        var query = Substring("")
+        if let mark = rest.firstIndex(of: "?") {
+            query = rest[rest.index(after: mark)...]
+            rest = rest[..<mark]
+        }
+
+        if let raw = query.split(separator: "&").first(where: { $0.hasPrefix("cluster=") }) {
+            guard let parsed = UInt128(tbString: String(raw.dropFirst("cluster=".count))) else { return nil }
             cluster = parsed
         }
+
+        let parts = rest.split(separator: "/").map { String($0).removingPercentEncoding ?? String($0) }
+        guard let kind = parts.first?.lowercased() else { return nil }
+        let argument = parts.count > 1 ? parts[1] : nil
 
         switch (kind, argument) {
         case ("overview", _): self = .overview
