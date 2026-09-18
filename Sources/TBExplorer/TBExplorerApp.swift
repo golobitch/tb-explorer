@@ -87,12 +87,27 @@ struct GoCommands: Commands {
     @FocusedValue(Browser.self) private var browser
     /// The frontmost screen's filter row, when it has one.
     @FocusedValue(FilterFocus.self) private var filterFocus
+    /// What the frontmost screen can export, when it holds rows.
+    @FocusedValue(ExportSource.self) private var export
     @Environment(\.openWindow) private var openWindow
+
+    private func runExport(_ scope: ExportScope) {
+        guard let export else { return }
+        Task { await export.export(scope, session: session) }
+    }
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
             Button("New Window") { openWindow(id: "browser") }
                 .keyboardShortcut("n")
+        }
+        CommandGroup(after: .saveItem) {
+            Button("Export Loaded Rows…") { runExport(.loaded) }
+                .keyboardShortcut("e", modifiers: [.command, .shift])
+                .disabled(export == nil)
+            Button("Export All Matching…") { runExport(.all) }
+                .keyboardShortcut("e", modifiers: [.command, .shift, .option])
+                .disabled(export?.canScan != true)
         }
         CommandMenu("Go") {
             Button("Go to ID…") { browser?.isGoToPresented = true }

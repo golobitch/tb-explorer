@@ -56,7 +56,14 @@ final class ExportSource {
         let provenance = ExportProvenance(
             kind: payload.kind, clusterID: session.info?.clusterID, query: query, link: link)
         job.run(payload, scope: scope, choice: choice, context: context, provenance: provenance)
+        // `…:cancel` checks the promise that a cancelled export leaves nothing behind.
+        if parts.contains("cancel") { job.cancel() }
         while job.isRunning { try? await Task.sleep(for: .milliseconds(50)) }
+        if parts.contains("cancel") {
+            print("EXPORT-CANCELLED: file_exists=\(FileManager.default.fileExists(atPath: url.path)) "
+                + "finished=\(job.finished != nil) error=\(job.error ?? "none") rows=\(job.rowsWritten)")
+            return nil
+        }
         return job.finished
     }
     #endif
@@ -157,6 +164,11 @@ struct DebugExportModifier: ViewModifier {
             let parts = spec.split(separator: ":").map(String.init)
             guard parts.first == source.payload.kind, !source.debugExportRan else { return }
             source.debugExportRan = true
+            // `-TBExportPanel` opens the real save panel instead, so a screenshot can show it.
+            if UserDefaults.standard.bool(forKey: "TBExportPanel") {
+                await source.export(.loaded, session: session)
+                return
+            }
             // Wait for the table to fill, the way a person would before reaching for Export; a
             // fixed delay exported an empty screen.
             for _ in 0..<80 where source.payload.loadedCount == 0 {

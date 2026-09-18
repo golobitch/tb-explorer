@@ -23,6 +23,7 @@ import TBKit
 ///   prints the file as `EXPORT:` lines, since the sandbox allows no other readable destination
 /// - `-TBLink <url>`: delivers a `tb-explorer://` link as if it had been opened from outside,
 ///   and claims it here rather than waiting for the window to become key
+/// - `-TBSnapshotWindow <title>`: captures the window whose title contains this, e.g. the save panel
 /// - `-TBSettings YES`: opens the Settings window (snapshots then capture it)
 /// - `-TBSnapshot <name>`: after loading, draw the main window to `<name>.png` in the
 ///   app's temporary directory and quit. Needs no Screen Recording permission.
@@ -126,9 +127,12 @@ extension Session {
         print("snapshot: windows " + candidates.map(\.title).joined(separator: " | "))
         // With `-TBSettings`, capture the Settings window rather than the main one. SwiftUI gives
         // it a known identifier; its title is the selected pane, so the title is no help.
-        let wanted = UserDefaults.standard.bool(forKey: "TBSettings")
+        var wanted = UserDefaults.standard.bool(forKey: "TBSettings")
             ? candidates.first { ($0.identifier?.rawValue ?? "").contains("Settings") }
             : nil
+        if let title = UserDefaults.standard.string(forKey: "TBSnapshotWindow") {
+            wanted = candidates.first { $0.title.localizedCaseInsensitiveContains(title) }
+        }
         guard let window = wanted ?? NSApp.keyWindow.flatMap({ candidates.contains($0) ? $0 : nil }) ?? candidates.first,
               let frameView = window.contentView?.superview
         else {
