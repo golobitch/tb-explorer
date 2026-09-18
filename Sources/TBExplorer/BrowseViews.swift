@@ -8,6 +8,7 @@ struct AllAccountsView: View {
     @State private var applied = FilterFields.Parsed()
     @State private var filterError: Error?
     @AppStorage("accounts.newestFirst") private var newestFirst = false
+    @AppStorage("format.currency") private var currencyFormat = true
     @State private var list = PagedList<Account>()
     @State private var lookup = IDLookup()
 
@@ -24,11 +25,12 @@ struct AllAccountsView: View {
             Divider()
             AccountsTable(
                 list: list,
-                emptyText: applied == FilterFields.Parsed() ? "No Accounts" : "No Accounts Match These Filters")
+                emptyText: applied == FilterFields.Parsed() ? "No Accounts" : "No Accounts Match These Filters",
+                style: model.amountStyle(currency: currencyFormat))
         }
         .navigationTitle("Accounts")
         .navigationSubtitle("query_accounts")
-        .toolbar { BrowseToolbar(newestFirst: $newestFirst) { Task { await list.reload() } } }
+        .toolbar { BrowseToolbar(newestFirst: $newestFirst, currencyFormat: $currencyFormat) { Task { await list.reload() } } }
         .searchable(text: $lookup.text, placement: .toolbar, prompt: "Go to Account ID")
         .onSubmit(of: .search) { lookup.submit() }
         .task(id: lookup.request) { await openAccount() }
@@ -73,6 +75,7 @@ struct AllTransfersView: View {
     @State private var applied = FilterFields.Parsed()
     @State private var filterError: Error?
     @AppStorage("transfers.newestFirst") private var newestFirst = true
+    @AppStorage("format.currency") private var currencyFormat = true
     @State private var list = PagedList<Transfer>()
     @State private var lookup = IDLookup()
 
@@ -89,11 +92,12 @@ struct AllTransfersView: View {
             Divider()
             TransfersTable(
                 list: list,
-                emptyText: applied == FilterFields.Parsed() ? "No Transfers" : "No Transfers Match These Filters")
+                emptyText: applied == FilterFields.Parsed() ? "No Transfers" : "No Transfers Match These Filters",
+                style: model.amountStyle(currency: currencyFormat))
         }
         .navigationTitle("Transfers")
         .navigationSubtitle("query_transfers")
-        .toolbar { BrowseToolbar(newestFirst: $newestFirst) { Task { await list.reload() } } }
+        .toolbar { BrowseToolbar(newestFirst: $newestFirst, currencyFormat: $currencyFormat) { Task { await list.reload() } } }
         .searchable(text: $lookup.text, placement: .toolbar, prompt: "Go to Transfer ID")
         .onSubmit(of: .search) { lookup.submit() }
         .task(id: lookup.request) { await openTransfer() }
@@ -171,10 +175,12 @@ private struct BrowseQuery: Hashable {
 
 private struct BrowseToolbar: ToolbarContent {
     @Binding var newestFirst: Bool
+    @Binding var currencyFormat: Bool
     let reload: () -> Void
 
     var body: some ToolbarContent {
         ToolbarItemGroup {
+            CurrencyFormatToggle(isOn: $currencyFormat)
             Toggle(isOn: $newestFirst) {
                 Label("Newest First", systemImage: "arrow.up.arrow.down")
             }

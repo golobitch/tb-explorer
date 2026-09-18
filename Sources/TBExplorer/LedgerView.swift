@@ -101,6 +101,7 @@ struct LedgerView: View {
     @State private var applied = FilterFields.Parsed()
     @State private var filterError: Error?
     @AppStorage("ledger.newestFirst") private var newestFirst = false
+    @AppStorage("format.currency") private var currencyFormat = true
     @State private var list = PagedList<Account>()
 
     var body: some View {
@@ -110,12 +111,15 @@ struct LedgerView: View {
                 ErrorBanner(error: filterError).padding(.horizontal, 12).padding(.bottom, 8)
             }
             Divider()
-            AccountsTable(list: list, emptyText: "No Accounts in Ledger \(ledger)")
+            AccountsTable(
+                list: list, emptyText: "No Accounts in Ledger \(ledger)",
+                style: model.amountStyle(currency: currencyFormat))
         }
-        .navigationTitle("Ledger \(String(ledger))")
+        .navigationTitle(model.amountStyle(currency: currencyFormat).ledgerLabel(ledger))
         .navigationSubtitle("query_accounts")
         .toolbar {
             ToolbarItemGroup {
+                CurrencyFormatToggle(isOn: $currencyFormat)
                 Toggle(isOn: $newestFirst) {
                     Label("Newest First", systemImage: "arrow.up.arrow.down")
                 }

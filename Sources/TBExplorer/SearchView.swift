@@ -34,6 +34,7 @@ struct SearchView: View {
     @State private var queryError: Error?
     @State private var query: Query?
     @State private var generation = 0
+    @AppStorage("format.currency") private var currencyFormat = true
 
     @State private var accounts = PagedList<Account>()
     @State private var transfers = PagedList<Transfer>()
@@ -79,6 +80,7 @@ struct SearchView: View {
                             .disabled(!useTo)
                     }
                     Toggle("Newest First", isOn: $reversed)
+                    CurrencyFormatToggle(isOn: $currencyFormat)
                     if let queryError { Text(queryError.localizedDescription).foregroundStyle(.red) }
                     HStack {
                         Spacer()
@@ -100,8 +102,14 @@ struct SearchView: View {
             Group {
                 if let query {
                     switch query.kind {
-                    case .accounts: AccountsTable(list: accounts, emptyText: "No Matching Accounts")
-                    case .transfers: TransfersTable(list: transfers, emptyText: "No Matching Transfers")
+                    case .accounts:
+                        AccountsTable(
+                            list: accounts, emptyText: "No Matching Accounts",
+                            style: model.amountStyle(currency: currencyFormat))
+                    case .transfers:
+                        TransfersTable(
+                            list: transfers, emptyText: "No Matching Transfers",
+                            style: model.amountStyle(currency: currencyFormat))
                     }
                 } else {
                     ContentUnavailableView("Run a Query", systemImage: "magnifyingglass",

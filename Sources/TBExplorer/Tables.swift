@@ -4,6 +4,8 @@ import TBKit
 struct AccountsTable: View {
     let list: PagedList<Account>
     let emptyText: String
+    /// Read once here in the parent; never inside a cell.
+    var style: AmountStyle = .raw
     @Environment(AppModel.self) private var model
     @State private var selection = Set<UInt128>()
 
@@ -16,15 +18,26 @@ struct AccountsTable: View {
                         .onAppear { list.loadMoreIfNeeded(after: a) }
                 }
                 .width(min: 80, ideal: 140)
-                TableColumn("Code") { a in Text(String(a.code)).monospacedDigit() }
-                    .width(min: 40, ideal: 50)
+                TableColumn("Code") { a in CodeText(code: a.code, kind: .account, style: style) }
+                    .width(min: 40, ideal: 70)
                 TableColumn("Flags") { a in FlagsView(names: a.flags.names) }
                     .width(min: 60, ideal: 110)
-                TableColumn("Debits Pending") { a in AmountText(a.debitsPending).frame(maxWidth: .infinity, alignment: .trailing) }
-                TableColumn("Debits Posted") { a in AmountText(a.debitsPosted).frame(maxWidth: .infinity, alignment: .trailing) }
-                TableColumn("Credits Pending") { a in AmountText(a.creditsPending).frame(maxWidth: .infinity, alignment: .trailing) }
-                TableColumn("Credits Posted") { a in AmountText(a.creditsPosted).frame(maxWidth: .infinity, alignment: .trailing) }
-                TableColumn("Net (Cr − Dr)") { a in AmountText(a.netPosted).fontWeight(.medium).frame(maxWidth: .infinity, alignment: .trailing) }
+                TableColumn("Debits Pending") { a in
+                    AmountText(a.debitsPending, ledger: a.ledger, style: style).frame(maxWidth: .infinity, alignment: .trailing)
+                }
+                TableColumn("Debits Posted") { a in
+                    AmountText(a.debitsPosted, ledger: a.ledger, style: style).frame(maxWidth: .infinity, alignment: .trailing)
+                }
+                TableColumn("Credits Pending") { a in
+                    AmountText(a.creditsPending, ledger: a.ledger, style: style).frame(maxWidth: .infinity, alignment: .trailing)
+                }
+                TableColumn("Credits Posted") { a in
+                    AmountText(a.creditsPosted, ledger: a.ledger, style: style).frame(maxWidth: .infinity, alignment: .trailing)
+                }
+                TableColumn("Net (Cr − Dr)") { a in
+                    AmountText(a.netPosted, ledger: a.ledger, style: style)
+                        .fontWeight(.medium).frame(maxWidth: .infinity, alignment: .trailing)
+                }
                 TableColumn("Timestamp") { a in TimestampText(ns: a.timestamp) }
                     .width(min: 150, ideal: 220)
             }
@@ -55,6 +68,8 @@ struct TransfersTable: View {
     /// When set, adds a Side column relative to this account.
     var perspective: UInt128?
     let emptyText: String
+    /// Read once here in the parent; never inside a cell.
+    var style: AmountStyle = .raw
     @Environment(AppModel.self) private var model
     @State private var selection = Set<UInt128>()
 
@@ -72,10 +87,10 @@ struct TransfersTable: View {
                         Text(t.debitAccountID == perspective ? "Debit" : "Credit")
                             .foregroundStyle(t.debitAccountID == perspective ? .orange : .teal)
                     } else {
-                        Text(String(t.ledger)).monospacedDigit()
+                        Text(style.ledgerLabel(t.ledger)).monospacedDigit()
                     }
                 }
-                .width(min: 50, ideal: 60)
+                .width(min: 50, ideal: 90)
                 TableColumn("Debit Account") { t in
                     IDText(id: t.debitAccountID, route: .account(t.debitAccountID), open: model.open)
                 }
@@ -84,9 +99,11 @@ struct TransfersTable: View {
                     IDText(id: t.creditAccountID, route: .account(t.creditAccountID), open: model.open)
                 }
                 .width(min: 80, ideal: 130)
-                TableColumn("Amount") { t in AmountText(t.amount).frame(maxWidth: .infinity, alignment: .trailing) }
-                TableColumn("Code") { t in Text(String(t.code)).monospacedDigit() }
-                    .width(min: 40, ideal: 50)
+                TableColumn("Amount") { t in
+                    AmountText(t.amount, ledger: t.ledger, style: style).frame(maxWidth: .infinity, alignment: .trailing)
+                }
+                TableColumn("Code") { t in CodeText(code: t.code, kind: .transfer, style: style) }
+                    .width(min: 40, ideal: 70)
                 TableColumn("Flags") { t in FlagsView(names: t.flags.names) }
                     .width(min: 60, ideal: 160)
                 TableColumn("Timestamp") { t in TimestampText(ns: t.timestamp) }

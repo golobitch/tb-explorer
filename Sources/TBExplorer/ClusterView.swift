@@ -49,6 +49,8 @@ struct ClusterView: View {
 
 private struct Sidebar: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.openSettings) private var openSettings
+    @AppStorage("format.currency") private var currencyFormat = true
     @State private var newLedger = ""
 
     var body: some View {
@@ -75,13 +77,14 @@ private struct Sidebar: View {
                 }
                 ForEach(model.ledgers, id: \.self) { ledger in
                     Label {
-                        Text(String(ledger)).monospacedDigit()
+                        Text(model.amountStyle(currency: currencyFormat).ledgerLabel(ledger)).monospacedDigit()
                     } icon: {
                         Image(systemName: "books.vertical")
                     }
                     .tag(SidebarItem.ledger(ledger))
                     .contextMenu {
                         Button("Copy Ledger ID") { copyToPasteboard(String(ledger)) }
+                        Button("Edit Format…") { openSettings() }
                     }
                 }
             }

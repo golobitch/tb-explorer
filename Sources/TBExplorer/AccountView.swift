@@ -15,16 +15,17 @@ struct AccountView: View {
     @State private var account: Account?
     @State private var error: Error?
     @AppStorage("account.tab") private var tab: AccountTab = .transfers
+    @AppStorage("format.currency") private var currencyFormat = true
 
     var body: some View {
         Group {
             if let account {
                 VStack(spacing: 0) {
-                    AccountHeader(account: account)
+                    AccountHeader(account: account, style: model.amountStyle(currency: currencyFormat))
                     Divider()
                     switch tab {
-                    case .transfers: AccountTransfersTab(account: account)
-                    case .balances: BalanceHistoryTab(account: account)
+                    case .transfers: AccountTransfersTab(account: account, style: model.amountStyle(currency: currencyFormat))
+                    case .balances: BalanceHistoryTab(account: account, style: model.amountStyle(currency: currencyFormat))
                     case .raw: RawView(text: account.rawDescription)
                     }
                 }
@@ -41,7 +42,7 @@ struct AccountView: View {
             }
         }
         .navigationTitle("Account \(String(accountID))")
-        .navigationSubtitle(account.map { "Ledger \($0.ledger) · Code \($0.code)" } ?? "")
+        .navigationSubtitle(account.map { subtitle(for: $0) } ?? "")
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Picker("View", selection: $tab) {
@@ -51,12 +52,18 @@ struct AccountView: View {
                 .labelsHidden()
                 .fixedSize()
             }
-            ToolbarItem {
+            ToolbarItemGroup {
+                CurrencyFormatToggle(isOn: $currencyFormat)
                 Button { Task { await load() } } label: { Label("Reload", systemImage: "arrow.clockwise") }
                     .keyboardShortcut("r")
             }
         }
         .task(id: accountID) { await load() }
+    }
+
+    private func subtitle(for account: Account) -> String {
+        let style = model.amountStyle(currency: currencyFormat)
+        return "Ledger \(style.ledgerLabel(account.ledger)) · Code \(style.accountCodeLabel(account.code))"
     }
 
     private func load() async {
@@ -74,25 +81,28 @@ struct AccountView: View {
 
 private struct AccountHeader: View {
     let account: Account
+    let style: AmountStyle
     @Environment(AppModel.self) private var model
 
     var body: some View {
         Grid(alignment: .leading, horizontalSpacing: 28, verticalSpacing: 8) {
             GridRow {
-                cell("Debits Pending") { AmountText(account.debitsPending) }
-                cell("Debits Posted") { AmountText(account.debitsPosted) }
-                cell("Credits Pending") { AmountText(account.creditsPending) }
-                cell("Credits Posted") { AmountText(account.creditsPosted) }
-                cell("Net Posted (Cr − Dr)") { AmountText(account.netPosted).font(.title3.weight(.semibold)) }
+                cell("Debits Pending") { AmountText(account.debitsPending, ledger: account.ledger, style: style) }
+                cell("Debits Posted") { AmountText(account.debitsPosted, ledger: account.ledger, style: style) }
+                cell("Credits Pending") { AmountText(account.creditsPending, ledger: account.ledger, style: style) }
+                cell("Credits Posted") { AmountText(account.creditsPosted, ledger: account.ledger, style: style) }
+                cell("Net Posted (Cr − Dr)") {
+                    AmountText(account.netPosted, ledger: account.ledger, style: style).font(.title3.weight(.semibold))
+                }
             }
             GridRow {
                 cell("ID") { HStack(spacing: 4) { IDText(id: account.id); CopyButton(value: String(account.id)) } }
                 cell("Ledger") {
-                    Button(String(account.ledger)) { model.open(.ledger(account.ledger)) }
+                    Button(style.ledgerLabel(account.ledger)) { model.open(.ledger(account.ledger)) }
                         .buttonStyle(.link)
                         .monospacedDigit()
                 }
-                cell("Code") { Text(String(account.code)).monospacedDigit() }
+                cell("Code") { CodeText(code: account.code, kind: .account, style: style) }
                 cell("Flags") { FlagsView(names: account.flags.names, emptyText: "None") }
                 cell("Timestamp") { TimestampText(ns: account.timestamp) }
             }
@@ -116,6 +126,7 @@ private struct AccountHeader: View {
 
 private struct AccountTransfersTab: View {
     let account: Account
+    let style: AmountStyle
     @Environment(AppModel.self) private var model
     @AppStorage("account.debits") private var debits = true
     @AppStorage("account.credits") private var credits = true
@@ -184,7 +195,7 @@ private struct AccountTransfersTab: View {
                 searchBanner
             }
             Divider()
-            TransfersTable(list: list, perspective: account.id, emptyText: emptyText)
+            TransfersTable(list: list, perspective: account.id, emptyText: emptyText, style: style)
         }
         .searchable(text: $searchText, placement: .toolbar, prompt: "Find Transfer by ID")
         .onSubmit(of: .search, runSearch)
@@ -331,6 +342,7 @@ private struct TransfersQuery: Hashable {
 
 private struct BalanceHistoryTab: View {
     let account: Account
+    let style: AmountStyle
     @Environment(AppModel.self) private var model
     @State private var balances: [Balance]?
     @State private var error: Error?
@@ -353,7 +365,7 @@ private struct BalanceHistoryTab: View {
                 ContentUnavailableView("No Balance Changes Yet", systemImage: "chart.line.flattrend.xyaxis",
                                        description: Text("History is enabled, but no transfer has touched this account."))
             } else {
-                BalanceHistoryContent(balances: balances)
+                BalanceHistoryContent(balances: balances, ledger: account.ledger, style: style)
             }
         } else {
             ProgressView()
@@ -381,6 +393,8 @@ private struct BalancePoint: Identifiable {
 
 private struct BalanceHistoryContent: View {
     let balances: [Balance]
+    let ledger: UInt32
+    let style: AmountStyle
     @Environment(AppModel.self) private var model
     @State private var selection = Set<UInt64>()
     @State private var hoverDate: Date?
@@ -411,7 +425,7 @@ private struct BalanceHistoryContent: View {
                         legendValue("Credits", b.creditsPosted, .teal)
                         HStack(spacing: 4) {
                             Text("Net").foregroundStyle(.secondary)
-                            AmountText(b.netPosted)
+                            AmountText(b.netPosted, ledger: ledger, style: style)
                         }
                     } else {
                         Text("\(balances.count) snapshots · hover the chart for exact values")
@@ -451,11 +465,22 @@ private struct BalanceHistoryContent: View {
             Table(balances.reversed(), selection: $selection) {
                 TableColumn("Timestamp") { b in TimestampText(ns: b.timestamp) }
                     .width(min: 150, ideal: 220)
-                TableColumn("Debits Pending") { b in AmountText(b.debitsPending).frame(maxWidth: .infinity, alignment: .trailing) }
-                TableColumn("Debits Posted") { b in AmountText(b.debitsPosted).frame(maxWidth: .infinity, alignment: .trailing) }
-                TableColumn("Credits Pending") { b in AmountText(b.creditsPending).frame(maxWidth: .infinity, alignment: .trailing) }
-                TableColumn("Credits Posted") { b in AmountText(b.creditsPosted).frame(maxWidth: .infinity, alignment: .trailing) }
-                TableColumn("Net (Cr − Dr)") { b in AmountText(b.netPosted).fontWeight(.medium).frame(maxWidth: .infinity, alignment: .trailing) }
+                TableColumn("Debits Pending") { b in
+                    AmountText(b.debitsPending, ledger: ledger, style: style).frame(maxWidth: .infinity, alignment: .trailing)
+                }
+                TableColumn("Debits Posted") { b in
+                    AmountText(b.debitsPosted, ledger: ledger, style: style).frame(maxWidth: .infinity, alignment: .trailing)
+                }
+                TableColumn("Credits Pending") { b in
+                    AmountText(b.creditsPending, ledger: ledger, style: style).frame(maxWidth: .infinity, alignment: .trailing)
+                }
+                TableColumn("Credits Posted") { b in
+                    AmountText(b.creditsPosted, ledger: ledger, style: style).frame(maxWidth: .infinity, alignment: .trailing)
+                }
+                TableColumn("Net (Cr − Dr)") { b in
+                    AmountText(b.netPosted, ledger: ledger, style: style)
+                        .fontWeight(.medium).frame(maxWidth: .infinity, alignment: .trailing)
+                }
             }
             .tableStyle(.inset(alternatesRowBackgrounds: true))
             .contextMenu(forSelectionType: UInt64.self) { ts in
@@ -473,7 +498,7 @@ private struct BalanceHistoryContent: View {
         HStack(spacing: 4) {
             Circle().fill(color).frame(width: 7, height: 7)
             Text(title).foregroundStyle(.secondary)
-            AmountText(v)
+            AmountText(v, ledger: ledger, style: style)
         }
     }
 

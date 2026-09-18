@@ -9,13 +9,16 @@ struct TransferView: View {
     @State private var lookback = TBClient.defaultLookback
     @State private var isLoading = false
     @State private var showRaw = false
+    @AppStorage("format.currency") private var currencyFormat = true
+
+    private var style: AmountStyle { model.amountStyle(currency: currencyFormat) }
 
     var body: some View {
         Group {
             if let chain {
                 Form {
-                    TransferSections(transfer: chain.transfer)
-                    ChainSections(chain: chain, lookback: lookback, isLoading: isLoading) {
+                    TransferSections(transfer: chain.transfer, style: style)
+                    ChainSections(chain: chain, style: style, lookback: lookback, isLoading: isLoading) {
                         lookback = min(lookback * 10, TBClient.maxLookback)
                     }
                     Section("Raw") {
@@ -44,14 +47,19 @@ struct TransferView: View {
             }
         }
         .navigationTitle("Transfer \(String(transferID))")
-        .navigationSubtitle(chain.map { "Ledger \($0.transfer.ledger) · Code \($0.transfer.code)" } ?? "")
+        .navigationSubtitle(chain.map { subtitle(for: $0.transfer) } ?? "")
         .toolbar {
-            ToolbarItem {
+            ToolbarItemGroup {
+                CurrencyFormatToggle(isOn: $currencyFormat)
                 Button { Task { await load() } } label: { Label("Reload", systemImage: "arrow.clockwise") }
                     .keyboardShortcut("r")
             }
         }
         .task(id: "\(transferID)/\(lookback)") { await load() }
+    }
+
+    private func subtitle(for transfer: Transfer) -> String {
+        "Ledger \(style.ledgerLabel(transfer.ledger)) · Code \(style.transferCodeLabel(transfer.code))"
     }
 
     private func load() async {
@@ -71,6 +79,7 @@ struct TransferView: View {
 
 private struct TransferSections: View {
     let transfer: Transfer
+    let style: AmountStyle
     @Environment(AppModel.self) private var model
 
     var body: some View {
@@ -82,7 +91,8 @@ private struct TransferSections: View {
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
                     Text("Amount").font(.caption).foregroundStyle(.secondary)
-                    AmountText(transfer.amount).font(.title2.weight(.semibold))
+                    AmountText(transfer.amount, ledger: transfer.ledger, style: style)
+                        .font(.title2.weight(.semibold))
                 }
             }
             .padding(.vertical, 4)
@@ -101,10 +111,10 @@ private struct TransferSections: View {
                     .monospacedDigit()
             }
             LabeledContent("Ledger") {
-                Button(String(transfer.ledger)) { model.open(.ledger(transfer.ledger)) }
+                Button(style.ledgerLabel(transfer.ledger)) { model.open(.ledger(transfer.ledger)) }
                     .buttonStyle(.link)
             }
-            LabeledContent("Code") { Text(String(transfer.code)).monospacedDigit() }
+            LabeledContent("Code") { CodeText(code: transfer.code, kind: .transfer, style: style) }
             LabeledContent("user_data_128") { IDText(id: transfer.userData128) }
             LabeledContent("user_data_64") { Text(String(transfer.userData64)).monospacedDigit().textSelection(.enabled) }
             LabeledContent("user_data_32") { Text(String(transfer.userData32)).monospacedDigit().textSelection(.enabled) }
@@ -122,6 +132,7 @@ private struct TransferSections: View {
 
 private struct ChainSections: View {
     let chain: Chain
+    let style: AmountStyle
     let lookback: UInt32
     let isLoading: Bool
     let onSearchWider: () -> Void
@@ -137,7 +148,7 @@ private struct ChainSections: View {
 
         if let pending = chain.pending {
             Section(t.flags.contains(.voidPendingTransfer) ? "Voids Pending Transfer" : "Posts Pending Transfer") {
-                TransferRow(transfer: pending)
+                TransferRow(transfer: pending, style: style)
             }
         }
 
@@ -150,7 +161,7 @@ private struct ChainSections: View {
                     LabeledContent("Expires") { Text("Never").foregroundStyle(.secondary) }
                 }
                 if t.flags.contains(.pending) {
-                    ForEach(res.resolutions) { TransferRow(transfer: $0) }
+                    ForEach(res.resolutions) { TransferRow(transfer: $0, style: style) }
                 }
                 LabeledContent("Scanned") {
                     Text("\(res.scanned) later debit-account transfers\(res.exhausted ? " (all)" : "")")
@@ -178,7 +189,7 @@ private struct ChainSections: View {
 
         if !chain.linked.isEmpty {
             Section("Linked Group · \(chain.linked.count) Transfers") {
-                ForEach(chain.linked) { TransferRow(transfer: $0, isCurrent: $0.id == t.id) }
+                ForEach(chain.linked) { TransferRow(transfer: $0, isCurrent: $0.id == t.id, style: style) }
             }
         }
     }
@@ -187,6 +198,7 @@ private struct ChainSections: View {
 struct TransferRow: View {
     let transfer: Transfer
     var isCurrent = false
+    var style: AmountStyle = .raw
     @Environment(AppModel.self) private var model
 
     var body: some View {
@@ -204,7 +216,8 @@ struct TransferRow: View {
             }
             Spacer()
             FlagsView(names: transfer.flags.names, emptyText: "No flags")
-            AmountText(transfer.amount).frame(minWidth: 90, alignment: .trailing)
+            AmountText(transfer.amount, ledger: transfer.ledger, style: style)
+                .frame(minWidth: 90, alignment: .trailing)
         }
     }
 }

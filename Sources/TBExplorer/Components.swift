@@ -89,6 +89,8 @@ struct CopyButton: View {
 struct AmountText: View {
     let text: String
     var negative = false
+    /// The exact integer, shown on hover when the amount is displayed scaled.
+    var exact: String?
 
     init(_ v: UInt128) {
         text = TBFormat.amount(v)
@@ -99,11 +101,53 @@ struct AmountText: View {
         negative = v.isNegative && v.magnitude != 0
     }
 
+    init(_ v: UInt128, ledger: UInt32, style: AmountStyle) {
+        text = style.text(v, ledger: ledger)
+        exact = style.alternate(v, ledger: ledger)
+    }
+
+    init(_ v: SignedAmount, ledger: UInt32, style: AmountStyle) {
+        text = style.text(v, ledger: ledger)
+        negative = v.isNegative && v.magnitude != 0
+        exact = style.alternate(v, ledger: ledger)
+    }
+
     var body: some View {
         Text(text)
             .monospacedDigit()
             .foregroundStyle(negative ? AnyShapeStyle(.red) : AnyShapeStyle(.primary))
             .textSelection(.enabled)
+            .help(exact ?? "")
+    }
+}
+
+/// Switches amounts between the ledger's currency format and exact integers.
+/// One setting shown in several places, so every screen agrees on what a number means.
+struct CurrencyFormatToggle: View {
+    @Binding var isOn: Bool
+
+    var body: some View {
+        Toggle(isOn: $isOn) {
+            Label("Currency Format", systemImage: "dollarsign.circle")
+        }
+        .help("Format amounts using the ledger's ISO 4217 currency (ledger 840 → USD, two decimals). Off shows exact integers.")
+    }
+}
+
+/// A numeric `code` with its label from the connection's metadata, e.g. `10 · payment`.
+struct CodeText: View {
+    enum Kind { case transfer, account }
+
+    let code: UInt16
+    let kind: Kind
+    let style: AmountStyle
+
+    var body: some View {
+        let label = kind == .transfer ? style.transferCodeLabel(code) : style.accountCodeLabel(code)
+        Text(label)
+            .monospacedDigit()
+            .textSelection(.enabled)
+            .help(label == String(code) ? "" : "Code \(code)")
     }
 }
 

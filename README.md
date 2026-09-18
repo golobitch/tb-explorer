@@ -34,9 +34,10 @@ The TigerBeetle client protocol doesn't expose the server's release number. The 
   - For a pending transfer: its status (posted, voided, expired or pending). The app finds it by scanning later debit-account transfers within a bounded lookback, and **Search Wider** extends the scan tenfold.
   - For a linked transfer: every member of its linked group.
 - **Search**: paste an id (the app detects account vs transfer), or query by ledger, code, user_data_128/64/32 and time range.
+- **Readable amounts**: TigerBeetle stores amounts as integers and ledgers as bare numbers. With **Currency Format** on (the checkbox next to *Newest First*, and in Settings), the ledger id is read as an ISO 4217 numeric code, so ledger 840 shows `123456` as `1.234,56 $` and appears as `840 · USD`. The exact integer stays one hover away, and ledgers that aren't currencies stay raw. Settings ⌘, overrides the name, symbol and decimals per ledger, and names the numeric `code` values (`10 · payment`); overrides are stored per connection in `metadata.json`.
 - **Throughout**: ⌘K opens Go to ID. ids have Copy / Copy as Hex context menus, and the Go menu has keyboard shortcuts. Light and dark mode follow the system.
 
-ids, amounts and user_data are Swift `UInt128` / `UInt64` end to end, with no strings or floating point. The one exception is the balance chart, which plots `Double`; its hover readout and tables show exact values.
+ids, amounts and user_data are Swift `UInt128` / `UInt64` end to end, with no strings or floating point. Currency formatting is exact too: the decimal point is inserted into the digit string, so a 39-digit `UInt128.max` survives it. The one exception is the balance chart, which plots `Double`; its hover readout and tables show exact values.
 
 ### Why the wire format is decoded by hand
 
