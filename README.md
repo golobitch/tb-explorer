@@ -12,7 +12,7 @@ the build if either string appears in a front end. The only code that writes to 
 | Folder | What it is |
 | ------ | ---------- |
 | [`ui/`](ui) | The native macOS app (SwiftUI). Point it at a cluster and browse. |
-| [`cli/`](cli) | A terminal UI (Rust, ratatui) with k9s-style navigation, for the machine the cluster runs on. |
+| [`cli/`](cli) | A terminal UI (Rust, ratatui) with k9s-style navigation, for the machine the cluster runs on. macOS and Linux. |
 | [`website/`](website) | The landing page (Astro), deployed to GitHub Pages. |
 
 Both front ends talk to TigerBeetle through the official C client (`tb_client`), vendored once in
@@ -36,6 +36,8 @@ mismatch surfaces as a refusal to connect rather than as wrong data.
 make tb-up           # download, format, start and seed a local cluster on 127.0.0.1:3000
 make open            # generate the Xcode project and open the macOS app
 make cli-run         # run the terminal UI against the same cluster
+make test            # the macOS app's suites
+make cli-test        # the terminal UI's suites
 ```
 
 Both front ends share one `Makefile` at the root, so a dev cluster started once serves whichever

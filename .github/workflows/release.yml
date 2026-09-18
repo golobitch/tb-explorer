@@ -115,3 +115,42 @@ jobs:
             TigerBeetle-Explorer-macos-universal.zip
             SHA256SUMS
           generate_release_notes: true
+
+  # The terminal front end ships per target: a TUI is for the machine the cluster runs on, which is
+  # usually Linux, and Cargo builds one target at a time.
+  cli:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            target: aarch64-apple-darwin
+          - runner: macos-15
+            target: x86_64-apple-darwin
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup target add ${{ matrix.target }}
+
+      - name: Build
+        run: cd cli && cargo build --release --target ${{ matrix.target }}
+
+      - name: Package
+        run: |
+          NAME=tb-tui-${{ matrix.target }}
+          tar -czf "$NAME.tar.gz" -C cli/target/${{ matrix.target }}/release tb-tui
+          shasum -a 256 "$NAME.tar.gz" > "$NAME.sha256"
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            tb-tui-${{ matrix.target }}.tar.gz
+            tb-tui-${{ matrix.target }}.sha256

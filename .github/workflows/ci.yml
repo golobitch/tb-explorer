@@ -78,3 +78,55 @@ jobs:
       - name: Server log
         if: failure()
         run: tail -100 .tigerbeetle/server.log
+
+  cli:
+    name: cli (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS
+            runner: macos-15
+            # tb-seed is Swift, so only this runner can seed a cluster for the integration tests.
+            cluster: true
+          - name: Linux
+            runner: ubuntu-24.04
+            cluster: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          rustup toolchain install stable --profile minimal --component clippy,rustfmt
+          rustup default stable
+          cargo --version
+
+      - name: Vendored client matches pinned release
+        run: test "$(cat Vendor/tigerbeetle/VERSION)" = "$TB_VERSION"
+
+      - name: Format
+        run: cd cli && cargo fmt --check
+
+      - name: Clippy
+        run: cd cli && cargo clippy --all-targets -- -D warnings
+
+      - name: Start and seed TigerBeetle
+        if: matrix.cluster
+        run: |
+          make tb-format
+          nohup .bin/tigerbeetle start --addresses=$TB_ADDR --development .tigerbeetle/0_0.tigerbeetle > .tigerbeetle/server.log 2>&1 &
+          for i in $(seq 1 60); do nc -z 127.0.0.1 3000 && break; sleep 1; done
+          make seed TB_ADDR=$TB_ADDR
+
+      - name: Tests
+        # Without a cluster the integration tests skip themselves, exactly as the Swift suite does.
+        run: cd cli && ${{ matrix.cluster && 'TB_ADDRESS=$TB_ADDR' || '' }} cargo test
+
+      - name: One frame, against the seeded cluster
+        if: matrix.cluster
+        run: cd cli && cargo run -q -- --addresses $TB_ADDR --dump accounts
+
+      - name: Server log
+        if: failure() && matrix.cluster
+        run: tail -100 .tigerbeetle/server.log
