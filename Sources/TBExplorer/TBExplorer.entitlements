@@ -6,5 +6,9 @@
 	<true/>
 	<key>com.apple.security.network.client</key>
 	<true/>
+	<!-- Export only: the app can write to a file the user picked in a save panel, and to nothing
+	     else. It never reads or writes a path of its own choosing outside its container. -->
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
 </dict>
 </plist>

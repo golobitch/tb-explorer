@@ -136,6 +136,9 @@ struct TransfersTable: View {
             Divider()
             PageStatusBar(list: list, noun: "transfers")
         }
+        .onCopyCommand {
+            [NSItemProvider(object: selection.sorted().map { String($0) }.joined(separator: "\n") as NSString)]
+        }
     }
 }
 

@@ -96,8 +96,9 @@ final class PagedList<Item: Timestamped> {
     private(set) var hasMore = true
     private(set) var error: Error?
 
-    private var source: any PageSource<Item>
-    private var reversed: Bool
+    /// Readable so an export can re-run the same query without disturbing this list.
+    private(set) var source: any PageSource<Item>
+    private(set) var reversed: Bool
     private var generation = 0
 
     init(pageSize: UInt32? = nil) {

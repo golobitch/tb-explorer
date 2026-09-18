@@ -19,6 +19,8 @@ import TBKit
 ///   disconnected app and watch it be applied once the connection comes up
 /// - `-TBWindows <n>`: opens `n` windows onto the same connection
 /// - `-TBCopyLink <target>`: copies the link for e.g. `account:1015` and prints it as `LINK:<url>`
+/// - `-TBExport <loaded|all>:<csv|json>`: exports the frontmost screen into the app container and
+///   prints the file as `EXPORT:` lines, since the sandbox allows no other readable destination
 /// - `-TBLink <url>`: delivers a `tb-explorer://` link as if it had been opened from outside,
 ///   and claims it here rather than waiting for the window to become key
 /// - `-TBSettings YES`: opens the Settings window (snapshots then capture it)

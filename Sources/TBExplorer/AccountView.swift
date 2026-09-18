@@ -140,7 +140,18 @@ private struct AccountTransfersTab: View {
     @AppStorage("account.debits") private var debits = true
     @AppStorage("account.credits") private var credits = true
     @AppStorage("account.newestFirst") private var newestFirst = true
-    @State private var list = PagedList<Transfer>()
+    @State private var list: PagedList<Transfer>
+    @State private var export: ExportSource
+
+    init(account: Account, style: AmountStyle) {
+        self.account = account
+        self.style = style
+        let list = PagedList<Transfer>()
+        _list = State(initialValue: list)
+        _export = State(initialValue: ExportSource(
+            payload: .transfers(list), name: "tb-explorer-transfers-account\(account.id)",
+            ledger: account.ledger))
+    }
 
     @State private var fields = FilterFields()
     @State private var applied = FilterFields.Parsed()
@@ -208,6 +219,8 @@ private struct AccountTransfersTab: View {
             TransfersTable(list: list, perspective: account.id, emptyText: emptyText, style: style)
         }
         .focusedSceneValue(filterFocus)
+        .exportable(export)
+        .toolbar { ToolbarItem { ExportButton(source: export) } }
         .searchable(text: $searchText, placement: .toolbar, prompt: "Find Transfer by ID")
         .onSubmit(of: .search, runSearch)
         .onChange(of: searchText) { _, new in
@@ -232,6 +245,10 @@ private struct AccountTransfersTab: View {
                     reversed: newestFirst)
             }
             session.observe(list.items)
+            export.query = applied.description(
+                operation: "get_account_transfers account=\(account.id)", ledger: account.ledger)
+            export.link = DeepLink.account(account.id)
+                .url(cluster: session.info?.clusterID).absoluteString
         }
         #if DEBUG
         .onAppear(perform: applyDebugArguments)
@@ -358,6 +375,15 @@ private struct BalanceHistoryTab: View {
     @Environment(Browser.self) private var browser
     @State private var balances: [Balance]?
     @State private var error: Error?
+    @State private var export: ExportSource
+
+    init(account: Account, style: AmountStyle) {
+        self.account = account
+        self.style = style
+        _export = State(initialValue: ExportSource(
+            payload: .balances([], ledger: account.ledger),
+            name: "tb-explorer-balances-account\(account.id)", ledger: account.ledger))
+    }
 
     var body: some View {
         if !account.flags.contains(.history) {
@@ -378,6 +404,8 @@ private struct BalanceHistoryTab: View {
                                        description: Text("History is enabled, but no transfer has touched this account."))
             } else {
                 BalanceHistoryContent(balances: balances, ledger: account.ledger, style: style)
+                    .exportable(export)
+                    .toolbar { ToolbarItem { ExportButton(source: export) } }
             }
         } else {
             ProgressView()
@@ -389,7 +417,12 @@ private struct BalanceHistoryTab: View {
     private func load() async {
         guard let client = session.client else { return }
         do {
-            balances = try await client.accountBalances(account.id, AccountFilter(limit: tbMaxLimit))
+            let loaded = try await client.accountBalances(account.id, AccountFilter(limit: tbMaxLimit))
+            balances = loaded
+            export.payload = .balances(loaded, ledger: account.ledger)
+            export.query = "get_account_balances account=\(account.id)"
+            export.link = DeepLink.account(account.id)
+                .url(cluster: session.info?.clusterID).absoluteString
         } catch {
             self.error = error
         }

@@ -119,8 +119,17 @@ struct LedgerView: View {
     @State private var filterError: Error?
     @AppStorage("ledger.newestFirst") private var newestFirst = false
     @AppStorage("format.currency") private var currencyFormat = true
-    @State private var list = PagedList<Account>()
+    @State private var list: PagedList<Account>
     @State private var filterFocus = FilterFocus()
+    @State private var export: ExportSource
+
+    init(ledger: UInt32) {
+        self.ledger = ledger
+        let list = PagedList<Account>()
+        _list = State(initialValue: list)
+        _export = State(initialValue: ExportSource(
+            payload: .accounts(list), name: "tb-explorer-accounts-ledger\(ledger)", ledger: ledger))
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -134,9 +143,11 @@ struct LedgerView: View {
                 style: session.amountStyle(currency: currencyFormat))
         }
         .focusedSceneValue(filterFocus)
+        .exportable(export)
         .navigationTitle(session.amountStyle(currency: currencyFormat).ledgerLabel(ledger))
         .navigationSubtitle("query_accounts")
         .toolbar {
+            ToolbarItem { ExportButton(source: export) }
             ToolbarItemGroup {
                 CurrencyFormatToggle(isOn: $currencyFormat)
                 Toggle(isOn: $newestFirst) {
@@ -160,6 +171,8 @@ struct LedgerView: View {
                         ledger: ledger, code: f.code, userData128: f.userData128,
                         userData64: f.userData64, userData32: f.userData32, reversed: newestFirst)),
                 reversed: newestFirst)
+            export.query = f.description(operation: "query_accounts", ledger: ledger)
+            export.link = DeepLink.ledger(ledger).url(cluster: session.info?.clusterID).absoluteString
         }
     }
 
@@ -182,6 +195,17 @@ private struct QueryKey: Hashable {
 extension FilterFields.Parsed: Hashable {}
 
 extension FilterFields.Parsed {
+    /// Reads back as the query that produced the rows, e.g. `query_transfers ledger=840 code=10`.
+    func description(operation: String, ledger overrideLedger: UInt32? = nil) -> String {
+        var parts = [operation]
+        if let l = overrideLedger ?? (ledger == 0 ? nil : ledger) { parts.append("ledger=\(l)") }
+        if code != 0 { parts.append("code=\(code)") }
+        if userData128 != 0 { parts.append("user_data_128=\(userData128)") }
+        if userData64 != 0 { parts.append("user_data_64=\(userData64)") }
+        if userData32 != 0 { parts.append("user_data_32=\(userData32)") }
+        return parts.joined(separator: " ")
+    }
+
     func queryFilter(reversed: Bool) -> QueryFilter {
         QueryFilter(
             ledger: ledger, code: code, userData128: userData128, userData64: userData64,

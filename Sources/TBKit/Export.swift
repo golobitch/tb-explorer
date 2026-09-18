@@ -67,26 +67,31 @@ public struct ExportContext: Sendable {
         metadata.format(forLedger: ledger, useCurrencies: true)
     }
 
-    /// The readable companion for an amount, or nil when the ledger has no format — in which case
-    /// the column is left out entirely rather than repeating the exact value under another name.
+    /// The readable companion for an amount.
+    ///
+    /// Present for every row once the reader asks for it, and empty for a ledger with no format:
+    /// one export can span ledgers, so a column that came and went per row would leave the file
+    /// ragged — values under the wrong headings, which is worse than a blank cell.
     func formatted(_ v: UInt128, ledger: UInt32) -> String? {
-        guard includeFormatted, let format = format(ledger) else { return nil }
+        guard includeFormatted else { return nil }
+        guard let format = format(ledger) else { return "" }
         return TBFormat.amount(v, format: format, grouping: grouping, decimal: decimal)
     }
 
     func formatted(_ v: SignedAmount, ledger: UInt32) -> String? {
-        guard includeFormatted, let format = format(ledger) else { return nil }
+        guard includeFormatted else { return nil }
+        guard let format = format(ledger) else { return "" }
         return TBFormat.amount(v, format: format, grouping: grouping, decimal: decimal)
     }
 
     func ledgerName(_ ledger: UInt32) -> String? {
         guard includeFormatted else { return nil }
-        return format(ledger)?.name
+        return format(ledger)?.name ?? ""
     }
 
     func codeLabel(_ code: UInt16, transfer: Bool) -> String? {
         guard includeFormatted else { return nil }
-        return transfer ? metadata.transferCode(code) : metadata.accountCode(code)
+        return (transfer ? metadata.transferCode(code) : metadata.accountCode(code)) ?? ""
     }
 }
 

@@ -98,12 +98,28 @@ struct ExportTests {
         #expect(rows[0].count == rows[1].count)
     }
 
-    @Test func aLedgerWithNoFormatGetsNoFormattedColumns() {
+    /// One export can span ledgers, so the columns cannot depend on the row: a ledger with no
+    /// format gets the column with nothing in it, never a shorter row.
+    @Test func aLedgerWithNoFormatGetsEmptyFormattedColumns() {
         let context = ExportContext(metadata: usd, includeFormatted: true)
         // 700 is unassigned in ISO 4217 and has no override.
         let rows = csv(exportText([transfer(ledger: 700)], format: .csv, context: context))
-        #expect(!rows[0].contains("amount_formatted"))
-        #expect(!rows[0].contains("ledger_name"))
+        let formatted = rows[0].firstIndex(of: "amount_formatted")!
+        let name = rows[0].firstIndex(of: "ledger_name")!
+        #expect(rows[1][formatted] == "")
+        #expect(rows[1][name] == "")
+    }
+
+    @Test func mixedLedgersKeepOneSetOfColumns() {
+        let context = ExportContext(metadata: usd, includeFormatted: true, decimal: ".")
+        let text = exportText(
+            [transfer(ledger: 700), transfer(ledger: 840)], format: .csv, context: context)
+        let rows = csv(text)
+        #expect(rows[0].count == rows[1].count)
+        #expect(rows[1].count == rows[2].count, "a ragged file puts values under the wrong heading")
+        let formatted = rows[0].firstIndex(of: "amount_formatted")!
+        #expect(rows[1][formatted] == "")
+        #expect(rows[2][formatted] == "710.01\u{00A0}$")
     }
 
     @Test func codeLabelsComeFromMetadata() {

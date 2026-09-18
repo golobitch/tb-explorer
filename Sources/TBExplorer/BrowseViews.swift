@@ -13,6 +13,13 @@ struct AllAccountsView: View {
     @State private var list = PagedList<Account>()
     @State private var lookup = IDLookup()
     @State private var filterFocus = FilterFocus()
+    @State private var export: ExportSource
+
+    init() {
+        let list = PagedList<Account>()
+        _list = State(initialValue: list)
+        _export = State(initialValue: ExportSource(payload: .accounts(list), name: "tb-explorer-accounts"))
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -31,9 +38,13 @@ struct AllAccountsView: View {
                 style: session.amountStyle(currency: currencyFormat))
         }
         .focusedSceneValue(filterFocus)
+        .exportable(export)
         .navigationTitle("Accounts")
         .navigationSubtitle("query_accounts")
-        .toolbar { BrowseToolbar(newestFirst: $newestFirst, currencyFormat: $currencyFormat) { Task { await list.reload() } } }
+        .toolbar {
+            ToolbarItem { ExportButton(source: export) }
+            BrowseToolbar(newestFirst: $newestFirst, currencyFormat: $currencyFormat) { Task { await list.reload() } }
+        }
         .searchable(text: $lookup.text, placement: .toolbar, prompt: "Go to Account ID")
         .onSubmit(of: .search) { lookup.submit() }
         .task(id: lookup.request) { await openAccount() }
@@ -43,6 +54,8 @@ struct AllAccountsView: View {
                 source: QueryAccountsSource(client: client, base: applied.queryFilter(reversed: newestFirst)),
                 reversed: newestFirst)
             session.observe(list.items)
+            export.query = applied.description(operation: "query_accounts")
+            export.link = DeepLink.accounts.url(cluster: session.info?.clusterID).absoluteString
         }
     }
 
@@ -83,6 +96,13 @@ struct AllTransfersView: View {
     @State private var list = PagedList<Transfer>()
     @State private var lookup = IDLookup()
     @State private var filterFocus = FilterFocus()
+    @State private var export: ExportSource
+
+    init() {
+        let list = PagedList<Transfer>()
+        _list = State(initialValue: list)
+        _export = State(initialValue: ExportSource(payload: .transfers(list), name: "tb-explorer-transfers"))
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -101,9 +121,13 @@ struct AllTransfersView: View {
                 style: session.amountStyle(currency: currencyFormat))
         }
         .focusedSceneValue(filterFocus)
+        .exportable(export)
         .navigationTitle("Transfers")
         .navigationSubtitle("query_transfers")
-        .toolbar { BrowseToolbar(newestFirst: $newestFirst, currencyFormat: $currencyFormat) { Task { await list.reload() } } }
+        .toolbar {
+            ToolbarItem { ExportButton(source: export) }
+            BrowseToolbar(newestFirst: $newestFirst, currencyFormat: $currencyFormat) { Task { await list.reload() } }
+        }
         .searchable(text: $lookup.text, placement: .toolbar, prompt: "Go to Transfer ID")
         .onSubmit(of: .search) { lookup.submit() }
         .task(id: lookup.request) { await openTransfer() }
@@ -113,6 +137,8 @@ struct AllTransfersView: View {
                 source: QueryTransfersSource(client: client, base: applied.queryFilter(reversed: newestFirst)),
                 reversed: newestFirst)
             session.observe(list.items)
+            export.query = applied.description(operation: "query_transfers")
+            export.link = DeepLink.transfers.url(cluster: session.info?.clusterID).absoluteString
         }
     }
 
