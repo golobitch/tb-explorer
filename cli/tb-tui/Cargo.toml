@@ -1,0 +1,13 @@
+[package]
+name = "tb-tui"
+description = "Read-only terminal browser for TigerBeetle clusters"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+tbclient.workspace = true
+ratatui = "0.30"
+crossterm = "0.29"

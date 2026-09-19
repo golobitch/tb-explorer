@@ -10,15 +10,15 @@ options:
 settingGroups:
   tigerbeetle:
     # CTigerBeetle module (tb_client.h + module.modulemap) and the vendored universal static lib.
-    SWIFT_INCLUDE_PATHS: $(SRCROOT)/Vendor/tigerbeetle/include
-    HEADER_SEARCH_PATHS: $(SRCROOT)/Vendor/tigerbeetle/include
-    LIBRARY_SEARCH_PATHS: $(SRCROOT)/Vendor/tigerbeetle/lib
+    SWIFT_INCLUDE_PATHS: $(SRCROOT)/../Vendor/tigerbeetle/include
+    HEADER_SEARCH_PATHS: $(SRCROOT)/../Vendor/tigerbeetle/include
+    LIBRARY_SEARCH_PATHS: $(SRCROOT)/../Vendor/tigerbeetle/lib
 
 settings:
   base:
     SWIFT_VERSION: "6.0"
     MACOSX_DEPLOYMENT_TARGET: "15.0"
-    MARKETING_VERSION: "0.0.3"
+    MARKETING_VERSION: "0.0.2"
     CURRENT_PROJECT_VERSION: "1"
     DEAD_CODE_STRIPPING: YES
 
@@ -96,8 +96,8 @@ schemes:
         - name: Ensure dev cluster
           settingsTarget: TBExplorer
           script: |
-            mkdir -p "${SRCROOT}/.tigerbeetle"
-            "${SRCROOT}/scripts/dev-cluster.sh" >> "${SRCROOT}/.tigerbeetle/dev-cluster.log" 2>&1 || true
+            mkdir -p "${SRCROOT}/../.tigerbeetle"
+            "${SRCROOT}/../scripts/dev-cluster.sh" >> "${SRCROOT}/../.tigerbeetle/dev-cluster.log" 2>&1 || true
       commandLineArguments:
         # Debug-only hook: connect straight to the dev cluster.
         "-TBConnect 127.0.0.1:3000": true
@@ -108,8 +108,8 @@ schemes:
         - name: Ensure dev cluster
           settingsTarget: TBExplorer
           script: |
-            mkdir -p "${SRCROOT}/.tigerbeetle"
-            "${SRCROOT}/scripts/dev-cluster.sh" >> "${SRCROOT}/.tigerbeetle/dev-cluster.log" 2>&1 || true
+            mkdir -p "${SRCROOT}/../.tigerbeetle"
+            "${SRCROOT}/../scripts/dev-cluster.sh" >> "${SRCROOT}/../.tigerbeetle/dev-cluster.log" 2>&1 || true
       environmentVariables:
         # Enables the integration suite.
         TB_ADDRESS: 127.0.0.1:3000

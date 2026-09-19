@@ -1,0 +1,8 @@
+# Pinned so a lint that lands in a new Rust release breaks the build when someone chooses to bump
+# it, not on the next unrelated push. The repo pins TigerBeetle and Xcode the same way.
+#
+# Bumping: change the channel, run `cargo clippy --all-targets -- -D warnings` and fix what the
+# newer lints find, in one commit.
+[toolchain]
+channel = "1.98.0"
+components = ["clippy", "rustfmt"]

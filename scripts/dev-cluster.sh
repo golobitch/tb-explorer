@@ -15,7 +15,8 @@ set -euo pipefail
 # tools and tb-seed warns about each one, cluttering the log.
 unset $(compgen -v SWIFT_) 2>/dev/null || true
 
-ROOT="${SRCROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
+# Derived from this script rather than SRCROOT, which Xcode sets to ui/, not the repo root.
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ADDR="${TB_ADDR:-127.0.0.1:3000}"
 HOST="${ADDR%:*}"
 PORT="${ADDR##*:}"
