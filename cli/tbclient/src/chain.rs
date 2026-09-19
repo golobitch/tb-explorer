@@ -187,13 +187,15 @@ impl Client {
                 reversed: true,
                 ..Default::default()
             })?;
-            let mut expect = transfer.timestamp - 1;
-            for candidate in before {
+            // Walking backwards: each step expects the timestamp one nanosecond earlier.
+            for (step, candidate) in before.into_iter().enumerate() {
+                let Some(expect) = transfer.timestamp.checked_sub(step as u64 + 1) else {
+                    break;
+                };
                 if candidate.timestamp != expect || candidate.flags & transfer_flags::LINKED == 0 {
                     break;
                 }
                 group.push(candidate);
-                expect -= 1;
             }
         }
 
@@ -203,16 +205,15 @@ impl Client {
                 limit: LINKED_PAGE,
                 ..Default::default()
             })?;
-            let mut expect = transfer.timestamp + 1;
-            for candidate in after {
-                if candidate.timestamp != expect {
+            // And forwards: one nanosecond later per step, until the chain's last member.
+            for (step, candidate) in after.into_iter().enumerate() {
+                if candidate.timestamp != transfer.timestamp + step as u64 + 1 {
                     break;
                 }
                 group.push(candidate);
                 if candidate.flags & transfer_flags::LINKED == 0 {
                     break;
                 }
-                expect += 1;
             }
         }
 

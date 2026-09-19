@@ -136,9 +136,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Toolchain
-        run: |
-          rustup toolchain install stable --profile minimal
-          rustup target add ${{ matrix.target }}
+        # Run from cli/ so the target lands on the toolchain rust-toolchain.toml pins.
+        run: cd cli && rustup show && rustup target add ${{ matrix.target }}
 
       - name: Build
         run: cd cli && cargo build --release --target ${{ matrix.target }}

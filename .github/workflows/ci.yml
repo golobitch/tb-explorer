@@ -99,10 +99,10 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Toolchain
-        run: |
-          rustup toolchain install stable --profile minimal --component clippy,rustfmt
-          rustup default stable
-          cargo --version
+        # The version comes from cli/rust-toolchain.toml, so CI and a developer's machine run the
+        # same clippy — a lint that lands in a new release should not fail an unrelated push.
+        # `rustup show` installs the pinned toolchain and its components if the runner lacks them.
+        run: cd cli && rustup show && cargo --version && cargo clippy --version
 
       - name: Vendored client matches pinned release
         run: test "$(cat Vendor/tigerbeetle/VERSION)" = "$TB_VERSION"
