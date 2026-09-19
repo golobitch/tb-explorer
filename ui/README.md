@@ -8,6 +8,17 @@ It's written in SwiftUI and talks to TigerBeetle through the official C client (
 
 ![TigerBeetle Explorer showing an account's balances and transfers](../docs/images/app-accounts-view.png)
 
+## Install
+
+```sh
+brew install --cask golobitch/tap/tb-explorer
+```
+
+Or download `TigerBeetle-Explorer-macos-universal.zip` from the
+[latest release](https://github.com/golobitch/tb-explorer/releases/latest), check it against
+`SHA256SUMS`, and drag the app to `/Applications`. Releases are signed with a Developer ID and
+notarized, so Gatekeeper opens them without a detour through System Settings.
+
 ## Version compatibility
 
 The TigerBeetle client is compiled into the app and must be compatible with the server. A mismatch appears in the connection list and the app refuses to connect.
@@ -105,7 +116,7 @@ make test            # unit + integration tests (⌘U in Xcode); the Test pre-ac
 make release         # universal (arm64 + x86_64) Release build
 ```
 
-Pushing a `v*` tag runs the release workflow, which publishes a zipped app and `SHA256SUMS`. The app is signed with a Developer ID and notarized when the `MACOS_*` / `APPLE_*` secrets are set; without them it's ad-hoc signed.
+Pushing a `ui-v*` tag runs `release-ui.yml`, which publishes a zipped app and `SHA256SUMS`, then updates the Homebrew cask. The app is signed with a Developer ID and notarized when the `MACOS_*` / `APPLE_*` secrets are set; without them it's ad-hoc signed. The tag is the version, and the workflow fails if it disagrees with the built `CFBundleShortVersionString`. See [`../docs/RELEASING.md`](../docs/RELEASING.md).
 
 ### Upgrading TigerBeetle
 

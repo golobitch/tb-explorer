@@ -1,0 +1,71 @@
+---
+import { installs } from "../../utils/data";
+import Container from "../shared/Container.astro";
+import Paragraph from "../shared/Paragraph.astro";
+import Title from "../shared/Title.astro";
+---
+
+<section id="install">
+    <Container className="flex flex-col items-center">
+        <div class="text-center max-w-2xl">
+            <Title>
+                Install it in one command
+            </Title>
+            <Paragraph className="mt-6">
+                Two front ends onto the same clusters: a native macOS app, and a terminal UI for the
+                machine the cluster runs on. Both come from the same tap and upgrade with
+                <code>brew upgrade</code>.
+            </Paragraph>
+        </div>
+
+        <div class="mt-12 w-full grid gap-6 md:grid-cols-2">
+            {installs.map((item) => (
+                <div class="relative flex flex-col rounded-3xl border border-box-border bg-box-bg shadow-lg shadow-box-shadow p-6 sm:p-8">
+                    <p class="text-sm uppercase tracking-wider text-heading-3">{item.subtitle}</p>
+                    <h3 class="mt-2 text-xl font-semibold text-heading-1">{item.title}</h3>
+                    <Paragraph className="mt-3 text-base flex-1">{item.description}</Paragraph>
+
+                    <div class="mt-6 flex items-center gap-3 rounded-2xl bg-graphite text-white px-4 sm:px-5 py-4">
+                        <span class="text-primary select-none" aria-hidden="true">$</span>
+                        <code class="flex-1 min-w-0 overflow-x-auto whitespace-pre text-sm" data-command>{item.command}</code>
+                        <button
+                            type="button"
+                            class="shrink-0 rounded-lg border border-white/20 px-2.5 py-1.5 text-xs font-medium text-gray-200 hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                            data-copy
+                            aria-label={`Copy: ${item.command}`}
+                        >Copy</button>
+                    </div>
+
+                    <a
+                        href={item.alternativeHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="mt-4 text-sm text-heading-3 underline decoration-primary underline-offset-4 hover:text-heading-1"
+                    >{item.alternative}</a>
+                </div>
+            ))}
+        </div>
+    </Container>
+</section>
+
+<script>
+    // Progressive enhancement: the command is readable and selectable without this, and the
+    // button is only useful once clipboard access exists.
+    for (const button of document.querySelectorAll<HTMLButtonElement>("[data-copy]")) {
+        const command = button.parentElement?.querySelector("[data-command]")?.textContent;
+        if (!command || !navigator.clipboard) {
+            button.hidden = true;
+            continue;
+        }
+
+        button.addEventListener("click", async () => {
+            try {
+                await navigator.clipboard.writeText(command);
+            } catch {
+                return; // Denied or unavailable: leave the label alone rather than claim success.
+            }
+            button.textContent = "Copied";
+            setTimeout(() => (button.textContent = "Copy"), 1500);
+        });
+    }
+</script>
