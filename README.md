@@ -57,6 +57,11 @@ website/              landing page — see website/README.md
 
 Each folder has its own README covering how to build, test and release it.
 
+## Licence
+
+MIT — see [LICENSE](LICENSE). `website/LICENCE.md` covers the Astro theme the landing page is built
+from, and belongs to its author.
+
 ## Upgrading TigerBeetle
 
 `make vendor TB_VERSION=x.y.z` refreshes the client for **both** front ends from the
