@@ -1,0 +1,157 @@
+name: release-cli
+
+# The terminal UI ships on its own tag — cli-v0.1.0 — so releasing it never rebuilds or
+# re-notarizes the macOS app. Four targets and two .deb packages are built in parallel and
+# published by a single job: several jobs calling action-gh-release against one release race,
+# and the loser silently drops its assets.
+on:
+  push:
+    tags: ['cli-v*']
+
+permissions:
+  contents: write
+
+jobs:
+  version:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version from tag, checked against the crate
+        id: version
+        run: |
+          VERSION="${GITHUB_REF_NAME#cli-v}"
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Tag '$GITHUB_REF_NAME' must look like cli-vMAJOR.MINOR.PATCH (e.g. cli-v0.1.0)"
+            exit 1
+          fi
+          # The tag is a claim about what is inside; disagreeing with the crate means one of the
+          # two is wrong, and publishing either would be a lie.
+          CRATE=$(awk -F'"' '/^version = /{print $2; exit}' cli/Cargo.toml)
+          if [ "$CRATE" != "$VERSION" ]; then
+            echo "::error::Tag says $VERSION but cli/Cargo.toml says $CRATE"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: version
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            target: aarch64-apple-darwin
+          - runner: macos-15
+            target: x86_64-apple-darwin
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        # Run from cli/ so the target lands on the toolchain rust-toolchain.toml pins.
+        run: cd cli && rustup show && rustup target add ${{ matrix.target }}
+
+      - name: Build
+        run: cd cli && cargo build --release --target ${{ matrix.target }}
+
+      - name: Package
+        run: |
+          NAME=tb-tui-${{ needs.version.outputs.version }}-${{ matrix.target }}
+          install -d "dist/$NAME"
+          cp cli/target/${{ matrix.target }}/release/tb-tui "dist/$NAME/"
+          cp LICENSE cli/README.md "dist/$NAME/"
+          tar -czf "$NAME.tar.gz" -C dist "$NAME"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tarball-${{ matrix.target }}
+          path: tb-tui-*.tar.gz
+          if-no-files-found: error
+
+  deb:
+    needs: version
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Built natively on each architecture, which avoids a cross linker entirely.
+          - runner: ubuntu-24.04
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: cd cli && rustup show
+
+      - name: Install cargo-deb
+        run: cargo install cargo-deb --locked
+
+      - name: Build the package
+        run: cd cli && cargo deb -p tb-tui
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deb-${{ matrix.arch }}
+          path: cli/target/debian/*.deb
+          if-no-files-found: error
+
+  publish:
+    needs: [version, build, deb]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+
+      - name: One checksum file for everything
+        run: |
+          cd assets
+          ls -1
+          shasum -a 256 * > SHA256SUMS
+          cat SHA256SUMS
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: tb-tui ${{ needs.version.outputs.version }}
+          files: assets/*
+          generate_release_notes: true
+          # The macOS app keeps the Latest badge: the website's download button follows
+          # /releases/latest, and so does the cask's livecheck.
+          make_latest: false
+
+      # Rebuilds the apt repository from this release, and points the Homebrew formula at it.
+      - name: Refresh the apt repository
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'pages.yml',
+              ref: context.payload.repository.default_branch,
+            })
+
+      - name: Bump the tap
+        if: ${{ secrets.TAP_TOKEN != '' }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.TAP_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'bump-tap.yml',
+              ref: context.payload.repository.default_branch,
+              inputs: { tag: context.ref.replace('refs/tags/', '') },
+            })
