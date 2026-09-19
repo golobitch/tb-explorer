@@ -7,7 +7,48 @@ navigation. Same data as the [macOS app](../ui), on the machine the cluster actu
 create path in the binary to disable. CI fails the build if `create_accounts` or `create_transfers`
 appears anywhere under `cli/`.
 
+## Install
+
+**Homebrew** (macOS and Linux):
+
+```sh
+brew install golobitch/tap/tb-tui
+```
+
+**Debian and Ubuntu**, from the apt repository, which keeps `tb-tui` upgrading with everything
+else:
+
+```sh
+sudo install -d /usr/share/keyrings
+curl -fsSL https://golobitch.github.io/tb-explorer/apt/golobitch-archive-keyring.asc \
+  | sudo gpg --dearmor -o /usr/share/keyrings/golobitch-archive-keyring.gpg
+
+sudo tee /etc/apt/sources.list.d/tb-explorer.sources >/dev/null <<'EOF'
+Types: deb
+URIs: https://golobitch.github.io/tb-explorer/apt
+Suites: stable
+Components: main
+Architectures: amd64 arm64
+Signed-By: /usr/share/keyrings/golobitch-archive-keyring.gpg
+EOF
+
+sudo apt update && sudo apt install tb-tui
+```
+
+Debian 12 or newer, Ubuntu 22.04 or newer. The `.deb` from a
+[release](https://github.com/golobitch/tb-explorer/releases) installs with `dpkg -i` too.
+
+**A tarball**, for anything else: pick your target from the latest `cli-v*`
+[release](https://github.com/golobitch/tb-explorer/releases), check it against `SHA256SUMS`, and
+put `tb-tui` on your `PATH`.
+
 ## Running
+
+```sh
+tb-tui --addresses 127.0.0.1:3000 --cluster 0
+```
+
+Against this repo's dev cluster:
 
 ```sh
 make tb-up      # a local cluster on 127.0.0.1:3000, shared with the macOS app
@@ -58,7 +99,8 @@ always one keypress away, and a ledger that is not a currency code is never scal
 ## Platforms
 
 macOS (arm64, x86_64) and Linux (arm64, x86_64, glibc). The client uses io_uring on Linux, so a
-kernel of 5.6 or newer is required.
+kernel of 5.6 or newer is required. The published Linux binaries are built on Debian 12, which puts
+the floor at glibc 2.36 — Debian 12, Ubuntu 22.04 and newer.
 
 ## Build
 

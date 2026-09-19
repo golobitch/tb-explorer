@@ -17,6 +17,10 @@ concurrency:
   group: pages
   cancel-in-progress: false
 
+env:
+  # A step's own env is not visible to its `if`, so expose the key's presence at workflow level.
+  APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+
 jobs:
   build:
     runs-on: ubuntu-24.04
@@ -37,6 +41,22 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      # The apt repository is assembled from the newest cli release and published beside the site,
+      # so `apt install tb-tui` upgrades. Nothing is committed: the packages are fetched here.
+      # Skipped when the signing key is missing, because an unsigned repository is worse than none.
+      - name: Build the apt repository
+        if: ${{ env.APT_GPG_PRIVATE_KEY != '' }}
+        working-directory: ${{ github.workspace }}
+        env:
+          APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+          APT_GPG_KEY_ID: ${{ secrets.APT_GPG_KEY_ID }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq dpkg-dev apt-utils
+          printf '%s' "$APT_GPG_PRIVATE_KEY" | gpg --batch --import
+          OUT=website/dist/apt scripts/build-apt-repo.sh
 
       - uses: actions/upload-pages-artifact@v5
         with:

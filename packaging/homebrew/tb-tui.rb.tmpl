@@ -1,0 +1,40 @@
+# Rendered by .github/workflows/bump-tap.yml from a published cli-v* release and committed to
+# golobitch/homebrew-tap. Do not edit the copy in the tap by hand — it is overwritten.
+class TbTui < Formula
+  desc "Read-only terminal browser for TigerBeetle clusters"
+  homepage "https://golobitch.github.io/tb-explorer/"
+  version "{{VERSION}}"
+  license "MIT"
+
+  on_macos do
+    on_arm do
+      url "{{MACOS_ARM_URL}}"
+      sha256 "{{MACOS_ARM_SHA}}"
+    end
+    on_intel do
+      url "{{MACOS_INTEL_URL}}"
+      sha256 "{{MACOS_INTEL_SHA}}"
+    end
+  end
+
+  on_linux do
+    on_arm do
+      url "{{LINUX_ARM_URL}}"
+      sha256 "{{LINUX_ARM_SHA}}"
+    end
+    on_intel do
+      url "{{LINUX_INTEL_URL}}"
+      sha256 "{{LINUX_INTEL_SHA}}"
+    end
+  end
+
+  def install
+    bin.install "tb-tui"
+    doc.install "README.md"
+  end
+
+  test do
+    # --help needs no cluster and no terminal, so it is the one thing that always works.
+    assert_match "tb-tui", shell_output("#{bin}/tb-tui --help")
+  end
+end

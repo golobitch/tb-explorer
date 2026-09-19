@@ -12,8 +12,43 @@ export const downloadAsset = "TigerBeetle-Explorer-macos-universal.zip";
 export const navItems = [
     { href: "#features", text: "Features" },
     { href: "#read-only", text: "Read-only" },
+    { href: "#install", text: "Install" },
     { href: "#compatibility", text: "Compatibility" },
     { href: "#open-source", text: "Open source" },
+];
+
+export const aptRepository = "https://golobitch.github.io/tb-explorer/apt";
+
+export type Install = {
+    title: string;
+    subtitle: string;
+    description: string;
+    command: string;
+    alternative: string;
+    alternativeHref: string;
+};
+
+// The one command each front end is installed with. Everything longer — the apt keyring and
+// .sources file — lives in the READMEs rather than on a landing page.
+export const installs: Install[] = [
+    {
+        title: "The macOS app",
+        subtitle: "Homebrew cask · macOS 15+",
+        description:
+            "A notarized universal build, so it opens without a detour through System Settings.",
+        command: "brew install --cask golobitch/tap/tb-explorer",
+        alternative: "Or download the zip and check it against SHA256SUMS",
+        alternativeHref: links.download,
+    },
+    {
+        title: "The terminal UI",
+        subtitle: "Homebrew formula · macOS and Linux",
+        description:
+            "tb-tui browses the same data with k9s-style navigation, on the machine the cluster runs on.",
+        command: "brew install golobitch/tap/tb-tui",
+        alternative: "On Debian and Ubuntu, install it from the apt repository instead",
+        alternativeHref: "https://github.com/golobitch/tb-explorer/tree/main/cli#install",
+    },
 ];
 
 const svg = (paths: string) =>

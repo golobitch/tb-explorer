@@ -1,8 +1,10 @@
-name: release
+name: release-ui
 
+# The macOS app ships on its own tag, so a terminal-UI fix does not rebuild, re-notarize and
+# re-publish an app that did not change. Tags look like ui-v0.1.0.
 on:
   push:
-    tags: ['v*']
+    tags: ['ui-v*']
 
 permissions:
   contents: write
@@ -22,13 +24,13 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
-      # The tag is the version: v0.0.3 builds as 0.0.3, with the run number as the build number.
+      # The tag is the version: ui-v0.1.0 builds as 0.1.0, with the run number as the build number.
       - name: Version from tag
         id: version
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${GITHUB_REF_NAME#ui-v}"
           if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::Tag '$GITHUB_REF_NAME' must look like vMAJOR.MINOR.PATCH (e.g. v0.0.3)"
+            echo "::error::Tag '$GITHUB_REF_NAME' must look like ui-vMAJOR.MINOR.PATCH (e.g. ui-v0.1.0)"
             exit 1
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
@@ -111,45 +113,25 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
+          name: TigerBeetle Explorer ${{ steps.version.outputs.version }}
           files: |
             TigerBeetle-Explorer-macos-universal.zip
             SHA256SUMS
           generate_release_notes: true
+          # The website's download button follows /releases/latest, so the app keeps the badge.
+          make_latest: true
 
-  # The terminal front end ships per target: a TUI is for the machine the cluster runs on, which is
-  # usually Linux, and Cargo builds one target at a time.
-  cli:
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: macos-15
-            target: aarch64-apple-darwin
-          - runner: macos-15
-            target: x86_64-apple-darwin
-          - runner: ubuntu-24.04
-            target: x86_64-unknown-linux-gnu
-          - runner: ubuntu-24.04-arm
-            target: aarch64-unknown-linux-gnu
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Toolchain
-        # Run from cli/ so the target lands on the toolchain rust-toolchain.toml pins.
-        run: cd cli && rustup show && rustup target add ${{ matrix.target }}
-
-      - name: Build
-        run: cd cli && cargo build --release --target ${{ matrix.target }}
-
-      - name: Package
-        run: |
-          NAME=tb-tui-${{ matrix.target }}
-          tar -czf "$NAME.tar.gz" -C cli/target/${{ matrix.target }}/release tb-tui
-          shasum -a 256 "$NAME.tar.gz" > "$NAME.sha256"
-
-      - uses: softprops/action-gh-release@v2
+      # Points the Homebrew cask at the release that was just published.
+      - name: Bump the tap
+        if: ${{ secrets.TAP_TOKEN != '' }}
+        uses: actions/github-script@v7
         with:
-          files: |
-            tb-tui-${{ matrix.target }}.tar.gz
-            tb-tui-${{ matrix.target }}.sha256
+          github-token: ${{ secrets.TAP_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'bump-tap.yml',
+              ref: context.payload.repository.default_branch,
+              inputs: { tag: context.ref.replace('refs/tags/', '') },
+            })

@@ -296,3 +296,16 @@ fn linked_groups_come_back_whole() {
     );
     assert!(chain.linked.iter().any(|t| t.id == linked.id));
 }
+
+/// The Swift client has asserted this since the start (`FormatTests.vendoredVersionMatches`); the
+/// Rust one did not, so a `make vendor` bump could leave this crate claiming the old release while
+/// linking the new archive. Runs with or without a cluster.
+#[test]
+fn the_client_version_matches_the_vendored_archive() {
+    // cli/tbclient/tests/ → the repo root, where Vendor is shared with the macOS app.
+    let vendored =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../Vendor/tigerbeetle/VERSION");
+    let expected = std::fs::read_to_string(&vendored)
+        .unwrap_or_else(|error| panic!("reading {}: {error}", vendored.display()));
+    assert_eq!(expected.trim(), tbclient::CLIENT_VERSION);
+}
