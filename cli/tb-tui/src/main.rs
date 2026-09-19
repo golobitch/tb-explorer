@@ -3,6 +3,7 @@
 mod app;
 #[cfg(test)]
 mod tests;
+mod theme;
 mod ui;
 mod worker;
 
@@ -13,6 +14,7 @@ use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifier
 use tbclient::Client;
 
 use crate::app::{App, Mode, View};
+use crate::theme::Theme;
 use crate::worker::Worker;
 
 struct Options {
@@ -21,12 +23,18 @@ struct Options {
     /// Render one frame as text and exit, for scripts and CI: the terminal equivalent of the
     /// macOS app's snapshot hook, and the only way to check real data without a tty.
     dump: Option<String>,
+    /// Colour off, for pipes, logs and terminals with their own ideas. `NO_COLOR` does the same.
+    plain: bool,
+    /// The size `--dump` renders at, so a narrow terminal can be checked without one.
+    size: (u16, u16),
 }
 
 fn parse_options() -> Result<Options, String> {
     let mut addresses = "127.0.0.1:3000".to_string();
     let mut cluster_id = 0u128;
     let mut dump = None;
+    let mut plain = false;
+    let mut size = (130u16, 20u16);
     let mut args = std::env::args().skip(1);
 
     while let Some(arg) = args.next() {
@@ -39,6 +47,15 @@ fn parse_options() -> Result<Options, String> {
                 cluster_id = raw
                     .parse()
                     .map_err(|_| format!("{raw} is not a cluster id"))?;
+            }
+            "--no-color" => plain = true,
+            "--size" => {
+                let raw = args.next().ok_or("--size needs WxH")?;
+                let (w, h) = raw.split_once('x').ok_or("--size looks like 80x24")?;
+                size = (
+                    w.parse().map_err(|_| "--size width")?,
+                    h.parse().map_err(|_| "--size height")?,
+                );
             }
             "--dump" => {
                 dump = Some(args.next().unwrap_or_else(|| "accounts".to_string()));
@@ -56,6 +73,8 @@ fn parse_options() -> Result<Options, String> {
         addresses,
         cluster_id,
         dump,
+        plain,
+        size,
     })
 }
 
@@ -77,10 +96,15 @@ fn main() {
     };
 
     let worker = Worker::spawn(Arc::clone(&client));
-    let mut app = App::new(options.cluster_id, options.addresses.clone(), worker);
+    let mut app = App::new(
+        options.cluster_id,
+        options.addresses.clone(),
+        worker,
+        Theme::detect(options.plain),
+    );
 
     if let Some(view) = options.dump {
-        print!("{}", dump_frame(&mut app, &view));
+        print!("{}", dump_frame(&mut app, &view, options.size));
         return;
     }
 
@@ -117,7 +141,7 @@ fn run(terminal: &mut ratatui::DefaultTerminal, app: &mut App) -> std::io::Resul
 }
 
 /// Waits for the first answer, draws one frame into an off-screen buffer and returns it as text.
-fn dump_frame(app: &mut App, view: &str) -> String {
+fn dump_frame(app: &mut App, view: &str, size: (u16, u16)) -> String {
     match view {
         "transfers" => app.show(View::Transfers),
         "ledgers" => app.show(View::Ledgers),
@@ -150,8 +174,8 @@ fn dump_frame(app: &mut App, view: &str) -> String {
     }
     app.drain();
 
-    let mut terminal =
-        ratatui::Terminal::new(ratatui::backend::TestBackend::new(130, 20)).expect("test backend");
+    let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(size.0, size.1))
+        .expect("test backend");
     terminal.draw(|frame| ui::draw(frame, app)).expect("draw");
     let buffer = terminal.backend().buffer().clone();
     (0..buffer.area.height)
@@ -207,6 +231,7 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         KeyCode::Enter => app.open_selection(),
         KeyCode::Char('b') => app.toggle_balances(),
         KeyCode::Char('a') => app.toggle_auto_refresh(),
+        KeyCode::Char('f') => app.toggle_currency(),
         _ => {}
     }
 }

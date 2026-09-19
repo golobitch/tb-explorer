@@ -12,7 +12,22 @@ use crate::worker::Worker;
 
 /// An app with no cluster behind it: queries go nowhere and no answer ever arrives.
 fn app() -> App {
-    App::new(0, "127.0.0.1:3000".to_string(), Worker::detached())
+    App::new(
+        0,
+        "127.0.0.1:3000".to_string(),
+        Worker::detached(),
+        crate::theme::Theme::detect(false),
+    )
+}
+
+/// The same screen with colour off, for the tests that check the monochrome fallback.
+fn plain_app() -> App {
+    App::new(
+        0,
+        "127.0.0.1:3000".to_string(),
+        Worker::detached(),
+        crate::theme::Theme::detect(true),
+    )
 }
 
 fn render(app: &App, width: u16, height: u16) -> String {
@@ -62,12 +77,18 @@ fn accounts_render_with_their_exact_amounts() {
     }]);
     let screen = render(&app, 120, 8);
     assert!(screen.contains("1015"), "{screen}");
-    assert!(screen.contains("1007430"), "exact, never rounded: {screen}");
+    assert!(
+        screen.contains("1\u{202F}007\u{202F}430"),
+        "exact, grouped, never rounded: {screen}"
+    );
     assert!(
         screen.contains("855"),
         "net is credits minus debits: {screen}"
     );
-    assert!(screen.contains("1 accounts"), "{screen}");
+    assert!(
+        screen.contains("[1]"),
+        "the title carries the count: {screen}"
+    );
 }
 
 #[test]
@@ -81,7 +102,7 @@ fn a_negative_net_keeps_its_sign() {
         ledger: 840,
         ..Default::default()
     }]);
-    assert!(render(&app, 120, 8).contains("-29885"));
+    assert!(render(&app, 120, 8).contains("-29\u{202F}885"));
 }
 
 #[test]
@@ -102,7 +123,7 @@ fn transfers_render_both_sides() {
     let screen = render(&app, 130, 8);
     assert!(screen.contains("100539"), "{screen}");
     assert!(screen.contains("1016"), "{screen}");
-    assert!(screen.contains("71001"), "{screen}");
+    assert!(screen.contains("71\u{202F}001"), "{screen}");
     assert!(screen.contains("pending"), "{screen}");
     assert!(screen.contains("query_transfers"), "{screen}");
 }
@@ -113,7 +134,7 @@ fn help_lists_every_binding_and_covers_the_table() {
     app.toggle_help();
     assert_eq!(app.mode, Mode::Help);
     let screen = render(&app, 100, 24);
-    for (key, _) in crate::ui::KEYS {
+    for (key, _) in crate::ui::overlay::KEYS {
         assert!(screen.contains(key), "{key} missing from help:\n{screen}");
     }
     assert!(screen.contains("read-only"), "{screen}");
@@ -188,7 +209,7 @@ fn enter_opens_the_selected_row_and_esc_comes_back() {
             balances: false
         }
     );
-    assert_eq!(app.breadcrumbs(), "accounts › account 1015");
+    assert_eq!(app.crumbs(), ["accounts", "account 1015"]);
 
     app.back();
     assert_eq!(
@@ -215,8 +236,8 @@ fn the_stack_goes_deeper_than_one_step() {
 
     assert_eq!(app.view, View::Transfer { id: 100_539 });
     assert_eq!(
-        app.breadcrumbs(),
-        "accounts › account 1015 › transfer 100539"
+        app.crumbs(),
+        ["accounts", "account 1015", "transfer 100539"]
     );
 
     app.back();
@@ -271,7 +292,7 @@ fn a_top_level_view_clears_the_trail() {
         app.stack.is_empty(),
         "`2` is a fresh start, not a step deeper"
     );
-    assert_eq!(app.breadcrumbs(), "transfers");
+    assert_eq!(app.crumbs(), ["transfers"]);
 }
 
 fn type_line(app: &mut App, text: &str) {
@@ -456,4 +477,211 @@ fn auto_refresh_holds_still_while_something_is_being_read() {
     app.stack.clear();
     app.begin_filter();
     assert!(!app.should_auto_refresh(due), "not while typing");
+}
+
+// Styles, not just text: TestBackend's buffer carries them, so the colours are testable.
+
+fn style_of(app: &App, width: u16, height: u16, needle: &str) -> ratatui::style::Style {
+    let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+    terminal.draw(|frame| crate::ui::draw(frame, app)).unwrap();
+    let buffer = terminal.backend().buffer().clone();
+    let first = needle.chars().next().unwrap();
+    for y in 0..buffer.area.height {
+        for x in 0..buffer.area.width {
+            if buffer[(x, y)].symbol().starts_with(first) {
+                let run: String = (x..buffer.area.width)
+                    .map(|i| buffer[(i, y)].symbol().to_string())
+                    .collect();
+                if run.starts_with(needle) {
+                    return buffer[(x, y)].style();
+                }
+            }
+        }
+    }
+    panic!("{needle:?} is not on screen");
+}
+
+#[test]
+fn a_flag_wears_the_colour_the_macos_app_gives_it() {
+    use ratatui::style::Color;
+    let mut app = app();
+    app.loading = false;
+    app.view = View::Transfers;
+    app.rows = Rows::Transfers(vec![Transfer {
+        id: 100_539,
+        flags: tbclient::models::transfer_flags::PENDING,
+        ..Default::default()
+    }]);
+    assert_eq!(style_of(&app, 130, 12, "pending").fg, Some(Color::Yellow));
+}
+
+#[test]
+fn a_negative_net_is_red_and_a_positive_one_is_not() {
+    use ratatui::style::Color;
+    let mut app = app();
+    app.loading = false;
+    app.rows = Rows::Accounts(vec![Account {
+        id: 1017,
+        debits_posted: 968_201,
+        credits_posted: 938_316,
+        ledger: 840,
+        ..Default::default()
+    }]);
+    assert_eq!(style_of(&app, 130, 12, "-29").fg, Some(Color::Red));
+
+    app.rows = Rows::Accounts(vec![Account {
+        id: 1015,
+        debits_posted: 1,
+        credits_posted: 856,
+        ledger: 840,
+        ..Default::default()
+    }]);
+    // Unstyled cells report Reset rather than None; either way, not red.
+    assert_ne!(style_of(&app, 130, 12, "855").fg, Some(Color::Red));
+}
+
+#[test]
+fn the_wordmark_turns_red_when_a_query_fails() {
+    use ratatui::style::Color;
+    let mut app = app();
+    app.loading = false;
+    assert_eq!(style_of(&app, 130, 24, "####").fg, Some(Color::Cyan));
+
+    app.error = Some("no answer within 10.0s".to_string());
+    assert_eq!(style_of(&app, 130, 24, "####").fg, Some(Color::Red));
+}
+
+#[test]
+fn no_color_leaves_no_colour_anywhere() {
+    let mut app = plain_app();
+    app.loading = false;
+    app.rows = Rows::Accounts(vec![Account {
+        id: 1017,
+        debits_posted: 968_201,
+        credits_posted: 938_316,
+        ledger: 840,
+        flags: tbclient::models::account_flags::HISTORY,
+        ..Default::default()
+    }]);
+
+    let mut terminal = Terminal::new(TestBackend::new(130, 24)).unwrap();
+    terminal.draw(|frame| crate::ui::draw(frame, &app)).unwrap();
+    let buffer = terminal.backend().buffer().clone();
+    for y in 0..buffer.area.height {
+        for x in 0..buffer.area.width {
+            let style = buffer[(x, y)].style();
+            // Reset is the absence of a colour; anything else would be one.
+            let plain = |colour: Option<ratatui::style::Color>| {
+                matches!(colour, None | Some(ratatui::style::Color::Reset))
+            };
+            assert!(plain(style.fg), "colour {:?} at {x},{y}", style.fg);
+            assert!(plain(style.bg), "background {:?} at {x},{y}", style.bg);
+        }
+    }
+}
+
+#[test]
+fn f_switches_amounts_into_the_ledgers_currency() {
+    let mut app = app();
+    app.loading = false;
+    app.rows = Rows::Accounts(vec![Account {
+        id: 1015,
+        debits_posted: 1_063_827,
+        ledger: 840,
+        ..Default::default()
+    }]);
+    assert!(render(&app, 130, 12).contains("1\u{202F}063\u{202F}827"));
+
+    app.toggle_currency();
+    let screen = render(&app, 130, 12);
+    assert!(screen.contains("10\u{202F}638.27 $"), "{screen}");
+    assert!(screen.contains("840 · USD"), "{screen}");
+
+    app.toggle_currency();
+    assert!(
+        render(&app, 130, 12).contains("1\u{202F}063\u{202F}827"),
+        "and back again"
+    );
+}
+
+#[test]
+fn a_ledger_that_is_not_a_currency_is_left_alone_even_in_currency_mode() {
+    let mut app = app();
+    app.loading = false;
+    app.toggle_currency();
+    app.rows = Rows::Accounts(vec![Account {
+        id: 1001,
+        debits_posted: 1_063_827,
+        ledger: 700,
+        ..Default::default()
+    }]);
+    let screen = render(&app, 130, 12);
+    assert!(screen.contains("1\u{202F}063\u{202F}827"), "{screen}");
+    assert!(!screen.contains("$"), "{screen}");
+}
+
+#[test]
+fn the_title_names_the_view_its_operation_and_its_count() {
+    let mut app = app();
+    app.loading = false;
+    app.rows = Rows::Accounts(vec![Account::default(), Account::default()]);
+    let screen = render(&app, 130, 12);
+    assert!(screen.contains("accounts(query_accounts)[2]"), "{screen}");
+    assert!(
+        screen.contains("1/2"),
+        "the cursor's place in the list: {screen}"
+    );
+}
+
+#[test]
+fn a_detail_view_shows_the_fields_above_the_table() {
+    let mut app = app();
+    app.view = View::Account {
+        id: 1017,
+        balances: false,
+    };
+    app.account = Some(Account {
+        id: 1017,
+        debits_posted: 968_201,
+        credits_posted: 938_316,
+        credits_pending: 71_001,
+        ledger: 840,
+        code: 2,
+        ..Default::default()
+    });
+    app.loading = false;
+    app.rows = Rows::Transfers(vec![Transfer {
+        id: 100_004,
+        ledger: 840,
+        ..Default::default()
+    }]);
+
+    let screen = render(&app, 130, 24);
+    assert!(screen.contains("account 1017"), "{screen}");
+    assert!(
+        screen.contains("968\u{202F}201"),
+        "its own figures: {screen}"
+    );
+    assert!(screen.contains("-29\u{202F}885"), "its net: {screen}");
+    assert!(
+        screen.contains("transfers(get_account_transfers)"),
+        "and the table beneath: {screen}"
+    );
+}
+
+#[test]
+fn the_header_collapses_on_a_small_terminal() {
+    let app = app();
+    let wide = render(&app, 130, 24);
+    assert!(wide.contains("context"), "the framed header at full size");
+
+    let short = render(&app, 130, 18);
+    assert!(
+        !short.contains("╭ context"),
+        "too few rows for a frame:\n{short}"
+    );
+    assert!(short.contains("READ-ONLY"), "but never without the badge");
+
+    let narrow = render(&app, 80, 24);
+    assert!(!narrow.contains("╭ context"), "too few columns:\n{narrow}");
 }

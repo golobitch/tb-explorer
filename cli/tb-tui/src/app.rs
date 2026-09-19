@@ -6,6 +6,7 @@ use tbclient::{
     Account, AccountFilter, Balance, Chain, DEFAULT_LOOKBACK, QueryFilter, TbError, Transfer,
 };
 
+use crate::theme::Theme;
 use crate::worker::{Query, Update, Worker};
 
 /// One screen. The stack of these is what `esc` walks back up.
@@ -98,6 +99,8 @@ pub struct App {
     pub stack: Vec<View>,
     pub rows: Rows,
     pub chain: Option<Box<Chain>>,
+    /// The account a detail view is about, for the fields pane above its transfers.
+    pub account: Option<Account>,
     pub selected: usize,
     pub mode: Mode,
     pub status: Option<String>,
@@ -107,6 +110,9 @@ pub struct App {
     /// the same approach the macOS app takes.
     pub ledgers: Vec<u32>,
     pub newest_first: bool,
+    pub theme: Theme,
+    /// How amounts read: grouped digits, or scaled into the ledger's currency.
+    pub amounts: tbclient::AmountStyle,
     /// Re-runs the current query on a timer. Paused while a row is selected or a detail view is
     /// open: a list that moves under the cursor is the one thing that makes k9s unpleasant, and
     /// this is a tool for reading carefully.
@@ -119,7 +125,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(cluster_id: u128, addresses: String, worker: Worker) -> Self {
+    pub fn new(cluster_id: u128, addresses: String, worker: Worker, theme: Theme) -> Self {
         let mut app = Self {
             cluster_id,
             addresses,
@@ -128,6 +134,7 @@ impl App {
             stack: Vec::new(),
             rows: Rows::None,
             chain: None,
+            account: None,
             selected: 0,
             mode: Mode::Normal,
             status: None,
@@ -135,6 +142,8 @@ impl App {
             loading: false,
             ledgers: Vec::new(),
             newest_first: false,
+            theme,
+            amounts: tbclient::AmountStyle::default(),
             auto_refresh: false,
             input: String::new(),
             filter: String::new(),
@@ -173,6 +182,10 @@ impl App {
                 self.loading = false;
             }
             View::Account { id, balances } => {
+                if self.account.map(|a| a.id) != Some(id) {
+                    self.account = None;
+                    self.worker.send(Query::Lookup { id });
+                }
                 let filter = AccountFilter {
                     account_id: id,
                     limit: 200,
@@ -290,6 +303,11 @@ impl App {
             Update::Balances { rows } => {
                 self.rows = Rows::Balances(rows);
                 self.loading = false;
+            }
+            Update::Found(tbclient::Found::Account(account)) if matches!(self.view, View::Account { id, .. } if id == account.id) =>
+            {
+                // The account behind the detail view, not a lookup the user asked for.
+                self.account = Some(account);
             }
             Update::Found(found) => {
                 self.status = Some(match found {
@@ -516,6 +534,12 @@ impl App {
         }
     }
 
+    /// Currency formatting on or off, the same bargain the macOS app's checkbox makes: the exact
+    /// integer is always one keypress away.
+    pub fn toggle_currency(&mut self) {
+        self.amounts.currency = !self.amounts.currency;
+    }
+
     pub fn toggle_auto_refresh(&mut self) {
         self.auto_refresh = !self.auto_refresh;
         self.last_refresh = Instant::now();
@@ -530,11 +554,25 @@ impl App {
             && self.last_refresh.elapsed() >= every
     }
 
-    /// Where you are, and how you got here.
-    pub fn breadcrumbs(&self) -> String {
+    /// The ledger the current view is about, which balances need because they carry none.
+    pub fn view_ledger(&self) -> u32 {
+        self.account.map(|a| a.ledger).unwrap_or(0)
+    }
+
+    /// Keeps the cursor inside the window of rows the table can show.
+    pub fn scroll_offset(&self, visible_height: usize) -> usize {
+        if visible_height == 0 || self.selected < visible_height {
+            0
+        } else {
+            self.selected - visible_height + 1
+        }
+    }
+
+    /// The trail as chips: one per level, the last one being where you are.
+    pub fn crumbs(&self) -> Vec<String> {
         let mut crumbs: Vec<String> = self.stack.iter().map(|view| view.title()).collect();
         crumbs.push(self.view.title());
-        crumbs.join(" › ")
+        crumbs
     }
 }
 
