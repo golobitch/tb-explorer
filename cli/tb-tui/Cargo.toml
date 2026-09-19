@@ -7,6 +7,25 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 
+# What `cargo deb` needs to build a package. The binary, the licence and the README go in; a
+# .sources file and keyring join them once the apt repository has a signing key, so that a manual
+# `dpkg -i` also gets upgrades.
+[package.metadata.deb]
+maintainer = "Tadej Golobič <tadej.golobic@icloud.com>"
+copyright = "2026, Tadej Golobič"
+license-file = ["../../LICENSE", "0"]
+extended-description = """\
+A read-only terminal browser for TigerBeetle clusters, with k9s-style navigation: accounts, \
+transfers, ledgers, balance history and pending chains. Connects to a cluster you name; it has \
+no create path and cannot change a cluster."""
+section = "utils"
+priority = "optional"
+depends = "$auto"
+assets = [
+    ["../target/release/tb-tui", "usr/bin/", "755"],
+    ["../README.md", "usr/share/doc/tb-tui/README.md", "644"],
+]
+
 [dependencies]
 tbclient.workspace = true
 ratatui = "0.30"

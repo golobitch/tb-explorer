@@ -36,21 +36,13 @@ jobs:
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-  build:
+  build-macos:
     needs: version
-    runs-on: ${{ matrix.runner }}
+    runs-on: macos-15
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - runner: macos-15
-            target: aarch64-apple-darwin
-          - runner: macos-15
-            target: x86_64-apple-darwin
-          - runner: ubuntu-24.04
-            target: x86_64-unknown-linux-gnu
-          - runner: ubuntu-24.04-arm
-            target: aarch64-unknown-linux-gnu
+        target: [aarch64-apple-darwin, x86_64-apple-darwin]
     steps:
       - uses: actions/checkout@v4
 
@@ -75,9 +67,59 @@ jobs:
           path: tb-tui-*.tar.gz
           if-no-files-found: error
 
+  # Built inside Debian 12 so the binary runs on Debian 12 and Ubuntu 22.04 too. On the runner
+  # image itself the binary picks up GLIBC_2.39 and dies on anything older — which is exactly what
+  # happened the first time this was built.
+  build-linux:
+    needs: version
+    runs-on: ${{ matrix.runner }}
+    container: debian:12
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+    steps:
+      - name: Container prerequisites
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq curl gcc git ca-certificates
+
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain none
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Build
+        # rustup reads cli/rust-toolchain.toml and installs the pinned version on first use.
+        run: cd cli && rustup show && rustup target add ${{ matrix.target }} && cargo build --release --target ${{ matrix.target }}
+
+      - name: Package
+        run: |
+          NAME=tb-tui-${{ needs.version.outputs.version }}-${{ matrix.target }}
+          install -d "dist/$NAME"
+          cp cli/target/${{ matrix.target }}/release/tb-tui "dist/$NAME/"
+          cp LICENSE cli/README.md "dist/$NAME/"
+          tar -czf "$NAME.tar.gz" -C dist "$NAME"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tarball-${{ matrix.target }}
+          path: tb-tui-*.tar.gz
+          if-no-files-found: error
+
   deb:
     needs: version
     runs-on: ${{ matrix.runner }}
+    # Same floor as the tarballs, and dpkg-dev is what lets `depends = "$auto"` find libc6.
+    # Without it the package declares no dependencies at all and installs onto systems it cannot
+    # run on.
+    container: debian:12
     strategy:
       fail-fast: false
       matrix:
@@ -88,13 +130,20 @@ jobs:
           - runner: ubuntu-24.04-arm
             arch: arm64
     steps:
+      - name: Container prerequisites
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq curl gcc git dpkg-dev ca-certificates
+
       - uses: actions/checkout@v4
 
       - name: Toolchain
-        run: cd cli && rustup show
+        run: |
+          curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain none
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
       - name: Install cargo-deb
-        run: cargo install cargo-deb --locked
+        run: cd cli && rustup show && cargo install cargo-deb --locked
 
       - name: Build the package
         run: cd cli && cargo deb -p tb-tui
@@ -106,7 +155,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    needs: [version, build, deb]
+    needs: [version, build-macos, build-linux, deb]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/download-artifact@v4
@@ -118,7 +167,8 @@ jobs:
         run: |
           cd assets
           ls -1
-          shasum -a 256 * > SHA256SUMS
+          # Named rather than globbed, so the checksum file can never list itself.
+          shasum -a 256 tb-tui-* > SHA256SUMS
           cat SHA256SUMS
 
       - uses: softprops/action-gh-release@v2
