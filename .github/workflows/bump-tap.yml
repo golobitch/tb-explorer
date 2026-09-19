@@ -1,0 +1,95 @@
+name: bump-tap
+
+# Points golobitch/homebrew-tap at a release that has just been published.
+#
+# The formula is rendered from a template rather than bumped by one of the usual actions: those
+# assume a single url/sha256 pair, and a four-target formula has four. Dispatched by
+# release-ui.yml and release-cli.yml, and runnable by hand when a tap edit needs redoing.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to publish (ui-v0.1.0 or cli-v0.1.0)'
+        required: true
+        type: string
+
+jobs:
+  bump:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: source
+
+      - name: The tap
+        uses: actions/checkout@v4
+        with:
+          repository: golobitch/homebrew-tap
+          token: ${{ secrets.TAP_TOKEN }}
+          path: tap
+
+      - name: Render the formula or the cask
+        env:
+          TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          BASE="https://github.com/$REPO/releases/download/$TAG"
+          mkdir -p downloads
+
+          # The checksum has to come from the published asset, not from a local rebuild: what
+          # users download is what must be verified.
+          fetch_sha() {
+            gh release download "$TAG" --repo "$REPO" --pattern "$1" --dir downloads --clobber
+            sha256sum "downloads/$1" | cut -d' ' -f1
+          }
+
+          if [[ "$TAG" == cli-v* ]]; then
+            VERSION="${TAG#cli-v}"
+            OUT=tap/Formula/tb-tui.rb
+            mkdir -p tap/Formula
+            cp source/packaging/homebrew/tb-tui.rb.tmpl "$OUT"
+            sed -i "s|{{VERSION}}|$VERSION|g" "$OUT"
+
+            render() {  # slot, target
+              local file="tb-tui-$VERSION-$2.tar.gz"
+              local sha; sha="$(fetch_sha "$file")"
+              sed -i "s|{{$1_URL}}|$BASE/$file|; s|{{$1_SHA}}|$sha|" "$OUT"
+            }
+            render MACOS_ARM    aarch64-apple-darwin
+            render MACOS_INTEL  x86_64-apple-darwin
+            render LINUX_ARM    aarch64-unknown-linux-gnu
+            render LINUX_INTEL  x86_64-unknown-linux-gnu
+          elif [[ "$TAG" == ui-v* ]]; then
+            VERSION="${TAG#ui-v}"
+            OUT=tap/Casks/tb-explorer.rb
+            mkdir -p tap/Casks
+            cp source/packaging/homebrew/tb-explorer.rb.tmpl "$OUT"
+            SHA="$(fetch_sha TigerBeetle-Explorer-macos-universal.zip)"
+            sed -i "s|{{VERSION}}|$VERSION|g; s|{{SHA}}|$SHA|" "$OUT"
+          else
+            echo "::error::Tag '$TAG' is neither ui-v* nor cli-v*"
+            exit 1
+          fi
+
+          # A leftover placeholder means an asset was missing and the file would install nothing.
+          if grep -q '{{' "$OUT"; then
+            echo "::error::$OUT still has unfilled placeholders"
+            grep -n '{{' "$OUT"
+            exit 1
+          fi
+          cat "$OUT"
+
+      - name: Commit to the tap
+        working-directory: tap
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula Casks 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "the tap already matches ${{ inputs.tag }}"
+            exit 0
+          fi
+          git commit -m "${{ inputs.tag }}"
+          git push
