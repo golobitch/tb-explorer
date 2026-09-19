@@ -139,3 +139,29 @@ jobs:
       - name: Server log
         if: failure() && matrix.cluster
         run: tail -100 .tigerbeetle/server.log
+
+  # A target that only breaks under --release is invisible until a tag is pushed, which is the
+  # worst moment to find out. This builds what release-cli.yml will build, without publishing.
+  cli-targets:
+    name: cli targets (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            target: aarch64-apple-darwin
+          - runner: macos-15
+            target: x86_64-apple-darwin
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: cd cli && rustup show && rustup target add ${{ matrix.target }}
+
+      - name: Release build
+        run: cd cli && cargo build --release --target ${{ matrix.target }}
