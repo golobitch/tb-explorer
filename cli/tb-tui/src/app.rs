@@ -1,5 +1,6 @@
 //! What is on screen, and what the keys do to it.
 
+use std::ops::Not;
 use std::time::{Duration, Instant};
 
 use tbclient::{
@@ -8,6 +9,10 @@ use tbclient::{
 
 use crate::theme::Theme;
 use crate::worker::{Query, Update, Worker};
+
+/// Rows per request. Large enough that scrolling rarely waits, small enough that the first screen
+/// arrives quickly.
+const PAGE: u32 = 200;
 
 /// One screen. The stack of these is what `esc` walks back up.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -158,7 +163,7 @@ impl App {
 
     pub fn filter(&self) -> QueryFilter {
         QueryFilter {
-            limit: 200,
+            limit: PAGE,
             reversed: self.newest_first,
             ..Default::default()
         }
@@ -188,7 +193,7 @@ impl App {
                 }
                 let filter = AccountFilter {
                     account_id: id,
-                    limit: 200,
+                    limit: PAGE,
                     reversed: self.newest_first,
                     ..Default::default()
                 };
@@ -364,6 +369,77 @@ impl App {
         let len = self.visible_len();
         if len > 0 {
             self.selected = (self.selected + 1).min(len - 1);
+        }
+        self.load_more_if_needed();
+    }
+
+    /// Reaching the end asks for the next page, the way the macOS app's tables do — a list that
+    /// stops at a round number looks like the cluster ran out of data.
+    fn load_more_if_needed(&mut self) {
+        if self.loading || self.filter.is_empty().not() || self.selected + 1 < self.rows_len() {
+            return;
+        }
+        let Some(last) = self.last_timestamp() else {
+            return;
+        };
+        let (min, max) = tbclient::next_cursor(last, self.newest_first);
+        let page = |mut filter: QueryFilter| {
+            filter.timestamp_min = min;
+            filter.timestamp_max = max;
+            filter
+        };
+
+        match self.view {
+            View::Accounts => {
+                self.loading = true;
+                self.worker.send(Query::Accounts {
+                    filter: page(self.filter()),
+                    append: true,
+                });
+            }
+            View::Transfers => {
+                self.loading = true;
+                self.worker.send(Query::Transfers {
+                    filter: page(self.filter()),
+                    append: true,
+                });
+            }
+            View::Account {
+                id,
+                balances: false,
+            } => {
+                self.loading = true;
+                self.worker.send(Query::AccountTransfers {
+                    filter: AccountFilter {
+                        account_id: id,
+                        limit: PAGE,
+                        reversed: self.newest_first,
+                        timestamp_min: min,
+                        timestamp_max: max,
+                        ..Default::default()
+                    },
+                    append: true,
+                });
+            }
+            _ => {}
+        }
+    }
+
+    fn rows_len(&self) -> usize {
+        match &self.rows {
+            Rows::Accounts(rows) => rows.len(),
+            Rows::Transfers(rows) => rows.len(),
+            Rows::Balances(rows) => rows.len(),
+            Rows::Ledgers(rows) => rows.len(),
+            Rows::None => 0,
+        }
+    }
+
+    fn last_timestamp(&self) -> Option<u64> {
+        match &self.rows {
+            Rows::Accounts(rows) => rows.last().map(|a| a.timestamp),
+            Rows::Transfers(rows) => rows.last().map(|t| t.timestamp),
+            _ => None,
         }
     }
 

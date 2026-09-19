@@ -27,6 +27,7 @@ make cli-run    # cargo run against it
 | `1` `2` `3` | Accounts, transfers, ledgers |
 | `j` `k` `g` `G` | Move; first and last row |
 | `o` | Newest first |
+| `f` | Amounts as ISO 4217 currency, or exact integers |
 | `ctrl-r` / `a` | Refresh now / every 2s |
 | `?` | Every binding |
 | `q` | Quit |
@@ -37,6 +38,22 @@ reading carefully.
 
 `:` asks the cluster a new question; `/` narrows the answer already on screen. TigerBeetle filters
 server-side only on the fields its query filters carry, which is why the two are separate.
+
+## What the colours mean
+
+The same vocabulary as the macOS app, so a flag means one thing across both: **pending** yellow,
+**posted** green, **voided** and **closed** red, **linked** purple, **history** blue, and a negative
+net red. The wordmark top-right doubles as a status light — cyan when idle, yellow while a query is
+in flight, red when one failed.
+
+Colours are named ANSI colours, so they inherit whatever scheme your terminal already uses.
+`NO_COLOR=1`, or `--no-color`, drops to bold and reverse video only.
+
+## Amounts
+
+Digits are grouped, and `f` switches between the exact integer TigerBeetle stores and the ledger
+read as an ISO 4217 currency — ledger 840 shows `1 063 827` or `10 638.27 $`. The exact value is
+always one keypress away, and a ledger that is not a currency code is never scaled.
 
 ## Platforms
 
@@ -55,7 +72,8 @@ make cli-test    # unit tests, plus integration tests when a cluster is up
 ```
 
 `--dump accounts|transfers|ledgers|help|account:1015|transfer:100539` renders one frame as text
-and exits, which is how CI and scripts check real data without a terminal.
+and exits, which is how CI and scripts check real data without a terminal. `--size 80x24` renders
+it at a given size, for checking that a narrow terminal still reads well.
 
 ## How it is tested
 

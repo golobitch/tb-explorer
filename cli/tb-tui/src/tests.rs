@@ -685,3 +685,62 @@ fn the_header_collapses_on_a_small_terminal() {
     let narrow = render(&app, 80, 24);
     assert!(!narrow.contains("╭ context"), "too few columns:\n{narrow}");
 }
+
+#[test]
+fn reaching_the_end_of_a_page_asks_for_the_next_one() {
+    let mut app = app();
+    app.loading = false;
+    app.rows = Rows::Transfers(vec![
+        Transfer {
+            id: 1,
+            timestamp: 10,
+            ..Default::default()
+        },
+        Transfer {
+            id: 2,
+            timestamp: 11,
+            ..Default::default()
+        },
+    ]);
+    app.view = View::Transfers;
+
+    app.select_next();
+    assert!(app.loading, "the last row asks for more");
+
+    app.loading = false;
+    app.select_previous();
+    app.select_next();
+    assert!(app.loading, "and asks again when it returns to the end");
+}
+
+#[test]
+fn a_filtered_list_does_not_page_behind_the_filter() {
+    let mut app = app();
+    app.loading = false;
+    app.view = View::Transfers;
+    app.rows = Rows::Transfers(vec![
+        Transfer {
+            id: 1,
+            ledger: 700,
+            timestamp: 10,
+            ..Default::default()
+        },
+        Transfer {
+            id: 2,
+            ledger: 840,
+            timestamp: 11,
+            ..Default::default()
+        },
+    ]);
+    app.begin_filter();
+    for c in "840".chars() {
+        app.type_char(c);
+    }
+    app.mode = crate::app::Mode::Normal;
+
+    app.select_next();
+    assert!(
+        !app.loading,
+        "the end of a filtered view is not the end of the query"
+    );
+}
