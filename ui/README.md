@@ -110,8 +110,10 @@ Pushing a `v*` tag runs the release workflow, which publishes a zipped app and `
 ### Upgrading TigerBeetle
 
 1. `make vendor TB_VERSION=X.Y.Z` refreshes `tb_client.h` and the universal `libtb_client.a`.
-2. Update `TBClient.clientVersion`, `TB_VERSION` in the `Makefile`, and `.github/workflows/ci.yml`.
-3. Run `make integration`, then add a row to the compatibility table.
+2. Update `TBClient.clientVersion`, `tbclient::CLIENT_VERSION` in [`../cli`](../cli), `TB_VERSION`
+   in the `Makefile`, and `.github/workflows/ci.yml`. Both front ends have a test that fails if
+   their constant and the vendored `VERSION` disagree.
+3. Run `make integration` and `make cli-test`, then update the compatibility table.
 
 ## Layout
 

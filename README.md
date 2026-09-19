@@ -65,5 +65,6 @@ from, and belongs to its author.
 ## Upgrading TigerBeetle
 
 `make vendor TB_VERSION=x.y.z` refreshes the client for **both** front ends from the
-`tigerbeetle-go` module of that release, then `make test` and `make cli-test` confirm the two agree
-with a cluster of the same version.
+`tigerbeetle-go` module of that release. Then update the version constant each front end carries —
+`TBClient.clientVersion` and `tbclient::CLIENT_VERSION` — and run `make test` and `make cli-test`,
+which fail when a constant and the vendored `VERSION` disagree.
