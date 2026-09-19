@@ -113,6 +113,13 @@ jobs:
       - name: Clippy
         run: cd cli && cargo clippy --all-targets -- -D warnings
 
+      # The seeder is a Swift target built by the Xcode project, so a Rust job that wants a seeded
+      # cluster needs XcodeGen too. A language-neutral seeder would remove this; until then, one
+      # fixture shared by both suites is worth the install.
+      - name: Install XcodeGen
+        if: matrix.cluster
+        run: brew install xcodegen
+
       - name: Start and seed TigerBeetle
         if: matrix.cluster
         run: |
