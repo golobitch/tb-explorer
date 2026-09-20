@@ -27,6 +27,12 @@ struct Options {
     plain: bool,
     /// The size `--dump` renders at, so a narrow terminal can be checked without one.
     size: (u16, u16),
+    /// A theme by name or by path. Overrides whatever the config file says.
+    theme: Option<String>,
+    /// Print a theme as a file and exit, which is how you start editing one.
+    dump_theme: Option<Option<String>>,
+    /// List what `--theme` accepts and exit.
+    list_themes: bool,
 }
 
 fn parse_options() -> Result<Options, String> {
@@ -35,7 +41,10 @@ fn parse_options() -> Result<Options, String> {
     let mut dump = None;
     let mut plain = false;
     let mut size = (130u16, 20u16);
-    let mut args = std::env::args().skip(1);
+    let mut theme = None;
+    let mut dump_theme = None;
+    let mut list_themes = false;
+    let mut args = std::env::args().skip(1).peekable();
 
     while let Some(arg) = args.next() {
         match arg.as_str() {
@@ -60,10 +69,17 @@ fn parse_options() -> Result<Options, String> {
             "--dump" => {
                 dump = Some(args.next().unwrap_or_else(|| "accounts".to_string()));
             }
+            "--theme" => {
+                theme = Some(args.next().ok_or("--theme needs a name or a path")?);
+            }
+            "--dump-theme" => {
+                // The name is optional, so only take the next argument when it is one.
+                let named = args.peek().is_some_and(|next| !next.starts_with('-'));
+                dump_theme = Some(named.then(|| args.next().expect("peeked")));
+            }
+            "--list-themes" => list_themes = true,
             "--help" | "-h" => {
-                println!(
-                    "tb-tui [--addresses 127.0.0.1:3000] [--cluster 0] [--dump accounts|transfers|ledgers|help]"
-                );
+                println!("{HELP}");
                 std::process::exit(0);
             }
             other => return Err(format!("unknown argument {other}")),
@@ -75,7 +91,43 @@ fn parse_options() -> Result<Options, String> {
         dump,
         plain,
         size,
+        theme,
+        dump_theme,
+        list_themes,
     })
+}
+
+/// `--help` is the only documentation someone has in the moment, so it names every flag.
+const HELP: &str = "\
+tb-tui — a read-only terminal browser for TigerBeetle
+
+  -a, --addresses <list>   replica addresses (default 127.0.0.1:3000)
+  -c, --cluster <id>       cluster id (default 0)
+      --theme <name|path>  colours, by preset name or theme file
+      --list-themes        every theme this binary knows
+      --dump-theme [name]  print a theme as a file, to edit and keep
+      --no-color           no colour at all; NO_COLOR does the same
+      --dump [view]        render one frame as text and exit
+                           accounts|transfers|ledgers|help|account:1015|transfer:100539
+      --size <WxH>         the size --dump renders at (default 130x20)
+  -h, --help               this";
+
+/// Colour off beats every theme: `NO_COLOR` is a promise, not a preference, so a theme can never
+/// turn colour back on.
+fn resolve_theme(options: &Options) -> Result<Theme, String> {
+    if Theme::plain_wanted(options.plain) {
+        return Ok(Theme::monochrome());
+    }
+
+    let spec = options
+        .theme
+        .clone()
+        .or_else(|| std::env::var("TB_TUI_THEME").ok());
+
+    match spec {
+        Some(spec) => Ok(Theme::from_palette(theme::load(&spec)?)),
+        None => Ok(Theme::colourful()),
+    }
 }
 
 fn main() {
@@ -87,6 +139,38 @@ fn main() {
         }
     };
 
+    // Everything about colour is answered before a socket is opened, so `--dump-theme` and
+    // `--list-themes` work on a machine that has no cluster to reach.
+    if options.list_themes {
+        for name in theme::BUILTIN {
+            println!("{name}");
+        }
+        return;
+    }
+
+    let theme = match resolve_theme(&options) {
+        Ok(theme) => theme,
+        Err(message) => {
+            eprintln!("tb-tui: {message}");
+            std::process::exit(2);
+        }
+    };
+
+    if let Some(requested) = &options.dump_theme {
+        let palette = match requested {
+            Some(name) => match theme::load(name) {
+                Ok(palette) => palette,
+                Err(message) => {
+                    eprintln!("tb-tui: {message}");
+                    std::process::exit(2);
+                }
+            },
+            None => theme.palette,
+        };
+        print!("{}", theme::parse::dump(&palette));
+        return;
+    }
+
     let client = match Client::connect(options.cluster_id, &options.addresses) {
         Ok(client) => Arc::new(client),
         Err(error) => {
@@ -96,12 +180,7 @@ fn main() {
     };
 
     let worker = Worker::spawn(Arc::clone(&client));
-    let mut app = App::new(
-        options.cluster_id,
-        options.addresses.clone(),
-        worker,
-        Theme::detect(options.plain),
-    );
+    let mut app = App::new(options.cluster_id, options.addresses.clone(), worker, theme);
 
     if let Some(view) = options.dump {
         print!("{}", dump_frame(&mut app, &view, options.size));

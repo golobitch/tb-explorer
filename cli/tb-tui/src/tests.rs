@@ -16,7 +16,7 @@ fn app() -> App {
         0,
         "127.0.0.1:3000".to_string(),
         Worker::detached(),
-        crate::theme::Theme::detect(false),
+        crate::theme::Theme::colourful(),
     )
 }
 
@@ -26,7 +26,20 @@ fn plain_app() -> App {
         0,
         "127.0.0.1:3000".to_string(),
         Worker::detached(),
-        crate::theme::Theme::detect(true),
+        crate::theme::Theme::monochrome(),
+    )
+}
+
+/// An app wearing a theme file, for checking that what a file says reaches the screen.
+fn themed_app(theme_file: &str) -> App {
+    let palette =
+        crate::theme::parse::parse(theme_file, "test.theme", crate::theme::default_palette())
+            .expect("the test theme parses");
+    App::new(
+        0,
+        "127.0.0.1:3000".to_string(),
+        Worker::detached(),
+        crate::theme::Theme::from_palette(palette),
     )
 }
 
@@ -742,5 +755,45 @@ fn a_filtered_list_does_not_page_behind_the_filter() {
     assert!(
         !app.loading,
         "the end of a filtered view is not the end of the query"
+    );
+}
+
+#[test]
+fn a_theme_file_reaches_the_screen() {
+    use ratatui::style::{Color, Modifier};
+
+    let mut app =
+        themed_app("table.header = #88c0d0 bold\nflag.pending = #ebcb8b\ntext = #d8dee9\n");
+    app.loading = false;
+    app.view = View::Transfers;
+    app.rows = Rows::Transfers(vec![Transfer {
+        id: 100_539,
+        flags: tbclient::models::transfer_flags::PENDING,
+        ..Default::default()
+    }]);
+
+    let header = style_of(&app, 130, 12, "id");
+    assert_eq!(header.fg, Some(Color::Rgb(0x88, 0xc0, 0xd0)));
+    assert!(header.add_modifier.contains(Modifier::BOLD));
+    assert_eq!(
+        style_of(&app, 130, 12, "pending").fg,
+        Some(Color::Rgb(0xeb, 0xcb, 0x8b))
+    );
+}
+
+#[test]
+fn the_base_colour_reaches_text_that_carries_no_style_of_its_own() {
+    use ratatui::style::Color;
+
+    let mut app = themed_app("text = #d8dee9\n");
+    app.loading = false;
+    app.mode = Mode::Command;
+    app.input = "transfer 100539".to_string();
+
+    // The typed command is a raw span: without a base coat it would keep the terminal's own
+    // foreground while every framed thing around it turned Nord.
+    assert_eq!(
+        style_of(&app, 130, 12, "transfer 100539").fg,
+        Some(Color::Rgb(0xd8, 0xde, 0xe9))
     );
 }
