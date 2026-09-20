@@ -797,3 +797,151 @@ fn the_base_colour_reaches_text_that_carries_no_style_of_its_own() {
         Some(Color::Rgb(0xd8, 0xde, 0xe9))
     );
 }
+
+/// The theme list, on an app whose config directory is a scratch one — a test must never write
+/// into the config of whoever is running it.
+mod themes {
+    use super::*;
+    use ratatui::style::Color;
+
+    struct Scratch(std::path::PathBuf);
+
+    impl Scratch {
+        fn new(name: &str) -> Self {
+            let path =
+                std::env::temp_dir().join(format!("tb-tui-app-{name}-{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&path);
+            std::fs::create_dir_all(&path).unwrap();
+            Self(path)
+        }
+    }
+
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn picking(scratch: &Scratch) -> App {
+        let mut app = app();
+        app.loading = false;
+        app.config = Some(scratch.0.clone());
+        app
+    }
+
+    #[test]
+    fn the_list_offers_every_preset_and_previews_as_it_moves() {
+        let scratch = Scratch::new("preview");
+        let mut app = picking(&scratch);
+        app.show_themes();
+
+        let picker = app.themes.as_ref().expect("the list is open");
+        assert_eq!(picker.names.first().map(String::as_str), Some("ansi"));
+        assert!(picker.names.iter().any(|name| name == "nord"));
+        assert_eq!(app.mode, Mode::Themes);
+
+        let nord = picker.names.iter().position(|name| name == "nord").unwrap();
+        app.move_theme(nord as isize);
+        assert_eq!(
+            app.theme.header.fg,
+            Some(Color::Rgb(0x88, 0xc0, 0xd0)),
+            "moving the selection did not repaint the screen"
+        );
+        assert!(
+            render(&app, 130, 24).contains("nord"),
+            "the list is not on screen"
+        );
+    }
+
+    #[test]
+    fn keeping_a_theme_writes_it_and_esc_puts_the_old_one_back() {
+        let scratch = Scratch::new("keep");
+        let mut app = picking(&scratch);
+        let before = app.theme.header.fg;
+
+        app.show_themes();
+        let nord = app
+            .themes
+            .as_ref()
+            .unwrap()
+            .names
+            .iter()
+            .position(|name| name == "nord")
+            .unwrap();
+        app.move_theme(nord as isize);
+        app.keep_theme();
+
+        assert_eq!(app.mode, Mode::Normal);
+        assert_eq!(
+            crate::config::theme(&scratch.0).as_deref(),
+            Some("nord"),
+            "the choice was not written down"
+        );
+
+        app.show_themes();
+        app.move_theme(1);
+        app.cancel_themes();
+        assert_eq!(app.mode, Mode::Normal);
+        assert_eq!(app.theme.header.fg, Some(Color::Rgb(0x88, 0xc0, 0xd0)));
+
+        assert_eq!(
+            before,
+            Some(Color::Cyan),
+            "the fixture was not the ansi theme"
+        );
+    }
+
+    #[test]
+    fn a_theme_of_your_own_shadows_the_preset_it_is_named_after() {
+        let scratch = Scratch::new("shadow");
+        std::fs::create_dir_all(scratch.0.join("themes")).unwrap();
+        std::fs::write(
+            scratch.0.join("themes/nord.theme"),
+            "table.header = #ff0000\n",
+        )
+        .unwrap();
+
+        let mut app = picking(&scratch);
+        app.choose_theme("nord");
+
+        assert_eq!(
+            app.theme.header.fg,
+            Some(Color::Rgb(0xff, 0, 0)),
+            "the preset won over the user's own file"
+        );
+        assert_eq!(
+            app.theme.logo.fg,
+            Some(Color::Cyan),
+            "a one-line theme should inherit the rest from the default"
+        );
+
+        let names = crate::theme::available(Some(&scratch.0));
+        assert_eq!(
+            names.iter().filter(|name| *name == "nord").count(),
+            1,
+            "nord is listed twice"
+        );
+    }
+
+    #[test]
+    fn naming_a_theme_that_does_not_exist_says_so_and_changes_nothing() {
+        let scratch = Scratch::new("missing");
+        let mut app = picking(&scratch);
+        let before = app.theme.header.fg;
+
+        app.choose_theme("nope");
+
+        assert_eq!(app.theme.header.fg, before);
+        assert!(
+            app.status
+                .as_deref()
+                .is_some_and(|status| status.contains("nope")),
+            "no complaint about an unknown theme: {:?}",
+            app.status
+        );
+        assert!(
+            !scratch.0.join("config").exists(),
+            "wrote a config for a theme that does not exist"
+        );
+    }
+}

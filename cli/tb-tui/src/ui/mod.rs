@@ -49,6 +49,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
     match app.mode {
         Mode::Help => overlay::help(frame, frame.area(), app),
         Mode::Commands => overlay::commands(frame, frame.area(), app),
+        Mode::Themes => overlay::themes(frame, frame.area(), app),
         _ => {}
     }
 }

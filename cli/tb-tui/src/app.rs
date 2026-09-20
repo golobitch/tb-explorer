@@ -70,6 +70,17 @@ pub enum Mode {
     Filter,
     /// `ctrl-a` — every command, for when you cannot remember one.
     Commands,
+    /// `:theme` — the theme list, previewing whatever is selected.
+    Themes,
+}
+
+/// The theme list while it is open. It holds the theme you arrived with, because moving the
+/// selection changes the whole screen and `esc` has to be able to undo that.
+#[derive(Clone, Debug)]
+pub struct ThemePicker {
+    pub names: Vec<String>,
+    pub index: usize,
+    restore: Theme,
 }
 
 /// What `:` understands. Aliases are listed because a command you cannot remember is a command you
@@ -82,6 +93,7 @@ pub const COMMANDS: &[(&str, &str, &str)] = &[
     ("balances <id>", "bal <id>", "one account's balance history"),
     ("transfer <id>", "tx <id>", "one transfer and its chain"),
     ("<id>", "", "whichever of the two that id names"),
+    ("theme [name]", "", "the colour theme, kept for next time"),
 ];
 
 /// The rows behind the current view.
@@ -116,6 +128,12 @@ pub struct App {
     pub ledgers: Vec<u32>,
     pub newest_first: bool,
     pub theme: Theme,
+    /// Where a kept theme is written. Held here rather than read from the environment where it is
+    /// used, so a test can point it somewhere harmless — and so the one path tb-tui writes to is
+    /// visible in the state rather than buried in a method.
+    pub config: Option<std::path::PathBuf>,
+    /// Open while `:theme` is choosing one.
+    pub themes: Option<ThemePicker>,
     /// How amounts read: grouped digits, or scaled into the ledger's currency.
     pub amounts: tbclient::AmountStyle,
     /// Re-runs the current query on a timer. Paused while a row is selected or a detail view is
@@ -148,6 +166,8 @@ impl App {
             ledgers: Vec::new(),
             newest_first: false,
             theme,
+            config: None,
+            themes: None,
             amounts: tbclient::AmountStyle::default(),
             auto_refresh: false,
             input: String::new(),
@@ -466,6 +486,7 @@ impl App {
     pub fn back(&mut self) {
         match self.mode {
             Mode::Help | Mode::Commands => self.mode = Mode::Normal,
+            Mode::Themes => self.cancel_themes(),
             Mode::Command | Mode::Filter => self.cancel_input(),
             Mode::Normal => {
                 if self.status.is_some() || self.error.is_some() {
@@ -536,7 +557,16 @@ impl App {
 
         let mut words = typed.split_whitespace();
         let command = words.next().unwrap_or_default();
-        let argument = words.next().and_then(|a| a.parse::<u128>().ok());
+        let word = words.next();
+        let argument = word.and_then(|a| a.parse::<u128>().ok());
+
+        if command == "theme" {
+            match word {
+                Some(name) => self.choose_theme(name),
+                None => self.show_themes(),
+            }
+            return;
+        }
 
         match (command, argument) {
             ("accounts" | "acc" | "a", None) => self.show(View::Accounts),
@@ -558,6 +588,97 @@ impl App {
                 }
                 Err(_) => self.status = Some(format!("no command “{typed}” — ctrl-a lists them")),
             },
+        }
+    }
+
+    /// Opens the theme list, previewing from wherever the current theme sits in it.
+    pub fn show_themes(&mut self) {
+        let names = crate::theme::available(self.config.as_deref());
+        let current = self.config.as_deref().and_then(crate::config::theme);
+        let index = current
+            .and_then(|name| names.iter().position(|candidate| *candidate == name))
+            .unwrap_or(0);
+
+        self.themes = Some(ThemePicker {
+            names,
+            index,
+            restore: self.theme,
+        });
+        self.mode = Mode::Themes;
+        self.preview_theme();
+    }
+
+    /// Moves the selection and shows what it looks like, because a theme is chosen by looking.
+    pub fn move_theme(&mut self, delta: isize) {
+        if let Some(picker) = &mut self.themes {
+            let count = picker.names.len() as isize;
+            if count == 0 {
+                return;
+            }
+            picker.index = (picker.index as isize + delta).rem_euclid(count) as usize;
+            self.preview_theme();
+        }
+    }
+
+    fn preview_theme(&mut self) {
+        let Some(picker) = &self.themes else { return };
+        let name = picker.names[picker.index].clone();
+        match crate::theme::resolve(&name, self.config.as_deref()) {
+            Ok(palette) => self.theme = Theme::from_palette(palette),
+            Err(message) => {
+                // Keep the screen readable and say why; a broken theme file should not blank it.
+                self.theme = picker.restore;
+                self.status = Some(message);
+            }
+        }
+    }
+
+    /// Keeps the previewed theme, and remembers it for next time.
+    pub fn keep_theme(&mut self) {
+        let Some(picker) = self.themes.take() else {
+            return;
+        };
+        self.mode = Mode::Normal;
+        let name = picker.names[picker.index].clone();
+        self.remember_theme(&name);
+    }
+
+    /// Puts back the theme that was on screen when the list opened.
+    pub fn cancel_themes(&mut self) {
+        if let Some(picker) = self.themes.take() {
+            self.theme = picker.restore;
+        }
+        self.mode = Mode::Normal;
+    }
+
+    /// `:theme <name>`, which skips the list.
+    pub fn choose_theme(&mut self, name: &str) {
+        match crate::theme::resolve(name, self.config.as_deref()) {
+            Ok(palette) => {
+                self.theme = Theme::from_palette(palette);
+                self.remember_theme(name);
+            }
+            Err(message) => self.status = Some(message),
+        }
+    }
+
+    /// Writing the config is the one thing tb-tui does to your disk, and a failure to do it is
+    /// worth a line in the footer rather than a crash: the theme is already on screen.
+    fn remember_theme(&mut self, name: &str) {
+        let Some(directory) = self.config.clone() else {
+            self.status = Some(format!(
+                "theme {name}, for now — no config directory to keep it in"
+            ));
+            return;
+        };
+        match crate::config::set_theme(&directory, name) {
+            Ok(()) => self.status = Some(format!("theme {name}")),
+            Err(error) => {
+                self.status = Some(format!(
+                    "theme {name}, but {}: {error}",
+                    directory.display()
+                ));
+            }
         }
     }
 

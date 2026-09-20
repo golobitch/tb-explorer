@@ -1,6 +1,7 @@
 //! A read-only terminal browser for TigerBeetle clusters.
 
 mod app;
+mod config;
 #[cfg(test)]
 mod tests;
 mod theme;
@@ -114,19 +115,34 @@ tb-tui — a read-only terminal browser for TigerBeetle
 
 /// Colour off beats every theme: `NO_COLOR` is a promise, not a preference, so a theme can never
 /// turn colour back on.
-fn resolve_theme(options: &Options) -> Result<Theme, String> {
+///
+/// Everything else is a preference, and preferences have an order: the flag, then the environment,
+/// then the config file, then the palette tb-tui ships with. The `Err` case is only for a theme
+/// the user named on the command line — a broken config file is reported, not obeyed, because a
+/// bad preference should never stand between you and a cluster.
+fn resolve_theme(
+    options: &Options,
+    config: Option<&std::path::Path>,
+) -> Result<(Theme, Option<String>), String> {
     if Theme::plain_wanted(options.plain) {
-        return Ok(Theme::monochrome());
+        return Ok((Theme::monochrome(), None));
     }
 
-    let spec = options
+    if let Some(spec) = options
         .theme
         .clone()
-        .or_else(|| std::env::var("TB_TUI_THEME").ok());
+        .or_else(|| std::env::var("TB_TUI_THEME").ok())
+    {
+        return Ok((Theme::from_palette(theme::resolve(&spec, config)?), None));
+    }
 
-    match spec {
-        Some(spec) => Ok(Theme::from_palette(theme::load(&spec)?)),
-        None => Ok(Theme::colourful()),
+    let Some(spec) = config.and_then(config::theme) else {
+        return Ok((Theme::colourful(), None));
+    };
+
+    match theme::resolve(&spec, config) {
+        Ok(palette) => Ok((Theme::from_palette(palette), None)),
+        Err(message) => Ok((Theme::colourful(), Some(message))),
     }
 }
 
@@ -155,8 +171,9 @@ fn main() {
         return;
     }
 
-    let theme = match resolve_theme(&options) {
-        Ok(theme) => theme,
+    let config = config::directory();
+    let (theme, complaint) = match resolve_theme(&options, config.as_deref()) {
+        Ok(resolved) => resolved,
         Err(message) => {
             eprintln!("tb-tui: {message}");
             std::process::exit(2);
@@ -165,7 +182,7 @@ fn main() {
 
     if let Some(requested) = &options.dump_theme {
         let palette = match requested {
-            Some(name) => match theme::load(name) {
+            Some(name) => match theme::resolve(name, config.as_deref()) {
                 Ok(palette) => palette,
                 Err(message) => {
                     eprintln!("tb-tui: {message}");
@@ -188,6 +205,10 @@ fn main() {
 
     let worker = Worker::spawn(Arc::clone(&client));
     let mut app = App::new(options.cluster_id, options.addresses.clone(), worker, theme);
+    // A theme that would not load is worth saying out loud, but only once and only in the footer:
+    // it is a preference, and you came here to read a cluster.
+    app.status = complaint;
+    app.config = config;
 
     if let Some(view) = options.dump {
         print!("{}", dump_frame(&mut app, &view, options.size));
@@ -283,6 +304,19 @@ fn handle_key(app: &mut App, key: KeyEvent) {
             KeyCode::Char('r') => app.reload(),
             KeyCode::Char('a') => app.show_commands(),
             KeyCode::Char('c') => app.quit = true,
+            _ => {}
+        }
+        return;
+    }
+
+    // The theme list is modal: moving the selection repaints the screen, so the keys that move it
+    // cannot also be doing their usual jobs underneath.
+    if app.mode == Mode::Themes {
+        match key.code {
+            KeyCode::Esc | KeyCode::Char('q') => app.cancel_themes(),
+            KeyCode::Enter => app.keep_theme(),
+            KeyCode::Char('j') | KeyCode::Down => app.move_theme(1),
+            KeyCode::Char('k') | KeyCode::Up => app.move_theme(-1),
             _ => {}
         }
         return;

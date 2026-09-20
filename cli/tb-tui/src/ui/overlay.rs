@@ -19,6 +19,7 @@ pub const KEYS: &[(&str, &str)] = &[
     ("/", "filter — narrow what is shown"),
     ("ctrl-a", "list every command"),
     ("f", "amounts as currency"),
+    (":theme", "colours — presets, or your own"),
     ("o", "newest first"),
     ("ctrl-r", "refresh"),
     ("a", "auto-refresh every 2s"),
@@ -63,6 +64,34 @@ pub fn commands(frame: &mut Frame, area: Rect, app: &App) {
     }));
 
     panel(frame, area, app, " : commands ", lines, 66);
+}
+
+/// The theme list. The screen behind it is already wearing whatever is selected, so the list is
+/// deliberately plain: the preview is the rest of the window, not a swatch in here.
+pub fn themes(frame: &mut Frame, area: Rect, app: &App) {
+    let theme = &app.theme;
+    let Some(picker) = &app.themes else { return };
+
+    let lines: Vec<Line> = picker
+        .names
+        .iter()
+        .enumerate()
+        .map(|(index, name)| {
+            let selected = index == picker.index;
+            let mark = if selected { "▌ " } else { "  " };
+            let style = if selected { theme.key } else { theme.hint };
+            Line::from(vec![Span::styled(format!("{mark}{name}"), style)])
+        })
+        .chain([
+            Line::raw(""),
+            Line::from(Span::styled(
+                "  j k to look · enter keeps it · esc puts it back",
+                theme.hint,
+            )),
+        ])
+        .collect();
+
+    panel(frame, area, app, " themes ", lines, 40);
 }
 
 fn panel(frame: &mut Frame, area: Rect, app: &App, title: &str, lines: Vec<Line>, width: u16) {

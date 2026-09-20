@@ -14,12 +14,65 @@ use ratatui::style::{Color, Modifier, Style};
 
 pub use role::{Palette, Role};
 
+/// Every theme that can be selected by name: the presets, plus whatever the user has put in
+/// `~/.config/tb-tui/themes/`. A user theme with a preset's name appears once, and shadows it.
+pub fn available(config: Option<&std::path::Path>) -> Vec<String> {
+    let mut names: Vec<String> = preset::ALL
+        .iter()
+        .map(|preset| preset.name.to_string())
+        .collect();
+
+    let mut mine: Vec<String> = directory_themes(config);
+    mine.sort();
+    for name in mine {
+        if !names.contains(&name) {
+            names.push(name);
+        }
+    }
+    names
+}
+
+fn directory_themes(config: Option<&std::path::Path>) -> Vec<String> {
+    let Some(directory) = config else {
+        return Vec::new();
+    };
+    let Ok(entries) = std::fs::read_dir(directory.join("themes")) else {
+        return Vec::new(); // No themes of your own is the common case, not a problem.
+    };
+
+    entries
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.extension()
+                .is_some_and(|extension| extension == "theme")
+        })
+        .filter_map(|path| {
+            path.file_stem()
+                .and_then(|stem| stem.to_str())
+                .map(str::to_string)
+        })
+        .collect()
+}
+
 /// The palette a name or a path asks for. Anything with a separator or an extension is a file;
 /// everything else is a name, so `nord` cannot accidentally mean the file `./nord`.
 ///
 /// A preset starts from nothing rather than from the default palette: a preset that forgot a role
 /// would otherwise show one stray cyan cell in an otherwise Nord screen. A file the user wrote
 /// starts from the default, so a two-line theme is a valid theme.
+pub fn resolve(spec: &str, config: Option<&std::path::Path>) -> Result<Palette, String> {
+    // A theme of the user's own shadows a preset of the same name, so `nord` can be adjusted
+    // without having to rename it to `nord-mine`.
+    if let Some(directory) = config
+        && let Some(path) = crate::config::user_theme(directory, spec)
+    {
+        return load(&path.to_string_lossy());
+    }
+    load(spec)
+}
+
+/// The palette a name or a path asks for, ignoring the user's themes directory.
 pub fn load(spec: &str) -> Result<Palette, String> {
     if spec.contains('/') || spec.contains('.') {
         let text = std::fs::read_to_string(spec).map_err(|error| format!("{spec}: {error}"))?;
