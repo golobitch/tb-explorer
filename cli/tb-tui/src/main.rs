@@ -142,8 +142,15 @@ fn main() {
     // Everything about colour is answered before a socket is opened, so `--dump-theme` and
     // `--list-themes` work on a machine that has no cluster to reach.
     if options.list_themes {
-        for name in theme::BUILTIN {
-            println!("{name}");
+        for preset in theme::preset::ALL {
+            // The mark is the one thing worth saying: a hex theme is unreadable where truecolor
+            // is not available, and ratatui will not downgrade it.
+            let mark = if preset.truecolor {
+                "  (truecolor)"
+            } else {
+                ""
+            };
+            println!("{}{mark}", preset.name);
         }
         return;
     }

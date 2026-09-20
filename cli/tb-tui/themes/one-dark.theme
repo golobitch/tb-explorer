@@ -1,0 +1,55 @@
+# One Dark — Atom's default dark theme
+#
+# Flags keep their meaning across every theme: pending is this palette's yellow,
+# voided and closed its red, linked its purple, history its blue — the same vocabulary
+# the macOS app uses. Delete the `on …` from `text` to keep your terminal's own
+# background (and its transparency).
+
+# base
+text           = #abb2bf on #282c34
+
+# chrome
+border         = #3e4451
+border.focus   = #61afef
+title          = #ffffff bold
+title.scope    = #61afef
+title.count    = #767c87
+label          = #767c87
+value          = #ffffff bold
+key            = #61afef bold
+hint           = #767c87
+logo           = #61afef
+badge          = #282c34 on #98c379 bold
+
+# table
+table.header   = #61afef bold
+table.cursor   = #282c34 on #61afef bold
+table.stripe   = on #2c313a
+table.id       = #56b6c2
+table.number   = default
+
+# state
+good           = #98c379
+warn           = #e5c07b
+bad            = #e06c75
+busy           = #e5c07b
+
+# flags
+flag.pending   = #e5c07b
+flag.posted    = #98c379
+flag.voided    = #e06c75
+flag.closed    = #e06c75
+flag.linked    = #c678dd
+flag.history   = #61afef
+flag.other     = #767c87
+
+# verdict
+status.posted  = #98c379
+status.voided  = #e06c75
+status.expired = #767c87
+status.pending = #e5c07b
+status.unknown = #e5c07b
+
+# amounts
+net.negative   = #e06c75
+net.positive   = default

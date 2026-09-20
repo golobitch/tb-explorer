@@ -1,0 +1,55 @@
+# Tokyo Night — github.com/enkia/tokyo-night-vscode-theme
+#
+# Flags keep their meaning across every theme: pending is this palette's yellow,
+# voided and closed its red, linked its purple, history its blue — the same vocabulary
+# the macOS app uses. Delete the `on …` from `text` to keep your terminal's own
+# background (and its transparency).
+
+# base
+text           = #a9b1d6 on #1a1b26
+
+# chrome
+border         = #292e42
+border.focus   = #7aa2f7
+title          = #c0caf5 bold
+title.scope    = #7aa2f7
+title.count    = #6b7396
+label          = #6b7396
+value          = #c0caf5 bold
+key            = #7aa2f7 bold
+hint           = #6b7396
+logo           = #7aa2f7
+badge          = #1a1b26 on #9ece6a bold
+
+# table
+table.header   = #7aa2f7 bold
+table.cursor   = #1a1b26 on #7aa2f7 bold
+table.stripe   = on #1f2335
+table.id       = #7dcfff
+table.number   = default
+
+# state
+good           = #9ece6a
+warn           = #e0af68
+bad            = #f7768e
+busy           = #e0af68
+
+# flags
+flag.pending   = #e0af68
+flag.posted    = #9ece6a
+flag.voided    = #f7768e
+flag.closed    = #f7768e
+flag.linked    = #bb9af7
+flag.history   = #7aa2f7
+flag.other     = #6b7396
+
+# verdict
+status.posted  = #9ece6a
+status.voided  = #f7768e
+status.expired = #6b7396
+status.pending = #e0af68
+status.unknown = #e0af68
+
+# amounts
+net.negative   = #f7768e
+net.positive   = default

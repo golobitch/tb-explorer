@@ -7,31 +7,31 @@
 //! of it — see [`role`] for the names, and the README for the file format.
 
 pub mod parse;
+pub mod preset;
 pub mod role;
 
 use ratatui::style::{Color, Modifier, Style};
 
 pub use role::{Palette, Role};
 
-/// The themes compiled into the binary, in the order `--list-themes` prints them.
-pub const BUILTIN: &[&str] = &["ansi", "mono"];
-
 /// The palette a name or a path asks for. Anything with a separator or an extension is a file;
 /// everything else is a name, so `nord` cannot accidentally mean the file `./nord`.
+///
+/// A preset starts from nothing rather than from the default palette: a preset that forgot a role
+/// would otherwise show one stray cyan cell in an otherwise Nord screen. A file the user wrote
+/// starts from the default, so a two-line theme is a valid theme.
 pub fn load(spec: &str) -> Result<Palette, String> {
     if spec.contains('/') || spec.contains('.') {
         let text = std::fs::read_to_string(spec).map_err(|error| format!("{spec}: {error}"))?;
         return parse::parse(&text, spec, default_palette()).map_err(|error| error.to_string());
     }
 
-    match spec {
-        "ansi" => Ok(default_palette()),
-        "mono" => Ok(monochrome_palette()),
-        other => Err(format!(
-            "unknown theme {other:?} — try one of: {}",
-            BUILTIN.join(", ")
-        )),
-    }
+    let preset = preset::find(spec).ok_or_else(|| {
+        let names: Vec<&str> = preset::ALL.iter().map(|preset| preset.name).collect();
+        format!("unknown theme {spec:?} — try one of: {}", names.join(", "))
+    })?;
+
+    parse::parse(preset.text, preset.name, Palette::blank()).map_err(|error| error.to_string())
 }
 
 #[derive(Clone, Copy, Debug)]

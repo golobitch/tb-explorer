@@ -1,0 +1,55 @@
+# Gruvbox dark — github.com/morhetz/gruvbox
+#
+# Flags keep their meaning across every theme: pending is this palette's yellow,
+# voided and closed its red, linked its purple, history its blue — the same vocabulary
+# the macOS app uses. Delete the `on …` from `text` to keep your terminal's own
+# background (and its transparency).
+
+# base
+text           = #ebdbb2 on #282828
+
+# chrome
+border         = #3c3836
+border.focus   = #8ec07c
+title          = #fbf1c7 bold
+title.scope    = #8ec07c
+title.count    = #928374
+label          = #928374
+value          = #fbf1c7 bold
+key            = #8ec07c bold
+hint           = #928374
+logo           = #8ec07c
+badge          = #282828 on #b8bb26 bold
+
+# table
+table.header   = #8ec07c bold
+table.cursor   = #282828 on #8ec07c bold
+table.stripe   = on #32302f
+table.id       = #83a598
+table.number   = default
+
+# state
+good           = #b8bb26
+warn           = #fabd2f
+bad            = #fb4934
+busy           = #fabd2f
+
+# flags
+flag.pending   = #fabd2f
+flag.posted    = #b8bb26
+flag.voided    = #fb4934
+flag.closed    = #fb4934
+flag.linked    = #d3869b
+flag.history   = #83a598
+flag.other     = #928374
+
+# verdict
+status.posted  = #b8bb26
+status.voided  = #fb4934
+status.expired = #928374
+status.pending = #fabd2f
+status.unknown = #fabd2f
+
+# amounts
+net.negative   = #fb4934
+net.positive   = default

@@ -1,0 +1,55 @@
+# Andromeda — github.com/EliverLara/Andromeda
+#
+# Flags keep their meaning across every theme: pending is this palette's yellow,
+# voided and closed its red, linked its purple, history its blue — the same vocabulary
+# the macOS app uses. Delete the `on …` from `text` to keep your terminal's own
+# background (and its transparency).
+
+# base
+text           = #d5ced9 on #23262e
+
+# chrome
+border         = #363b47
+border.focus   = #00e8c6
+title          = #ffffff bold
+title.scope    = #00e8c6
+title.count    = #6d7380
+label          = #6d7380
+value          = #ffffff bold
+key            = #00e8c6 bold
+hint           = #6d7380
+logo           = #00e8c6
+badge          = #23262e on #96e072 bold
+
+# table
+table.header   = #00e8c6 bold
+table.cursor   = #23262e on #00e8c6 bold
+table.stripe   = on #2b2f38
+table.id       = #7cb7ff
+table.number   = default
+
+# state
+good           = #96e072
+warn           = #ffe66d
+bad            = #ee5d43
+busy           = #ffe66d
+
+# flags
+flag.pending   = #ffe66d
+flag.posted    = #96e072
+flag.voided    = #ee5d43
+flag.closed    = #ee5d43
+flag.linked    = #c74ded
+flag.history   = #7cb7ff
+flag.other     = #6d7380
+
+# verdict
+status.posted  = #96e072
+status.voided  = #ee5d43
+status.expired = #6d7380
+status.pending = #ffe66d
+status.unknown = #ffe66d
+
+# amounts
+net.negative   = #ee5d43
+net.positive   = default

@@ -1,0 +1,55 @@
+# Solarized dark — ethanschoonover.com/solarized
+#
+# Flags keep their meaning across every theme: pending is this palette's yellow,
+# voided and closed its red, linked its purple, history its blue — the same vocabulary
+# the macOS app uses. Delete the `on …` from `text` to keep your terminal's own
+# background (and its transparency).
+
+# base
+text           = #839496 on #002b36
+
+# chrome
+border         = #073642
+border.focus   = #2aa198
+title          = #93a1a1 bold
+title.scope    = #2aa198
+title.count    = #657b83
+label          = #657b83
+value          = #93a1a1 bold
+key            = #2aa198 bold
+hint           = #657b83
+logo           = #2aa198
+badge          = #002b36 on #859900 bold
+
+# table
+table.header   = #2aa198 bold
+table.cursor   = #002b36 on #2aa198 bold
+table.stripe   = on #073642
+table.id       = #268bd2
+table.number   = default
+
+# state
+good           = #859900
+warn           = #b58900
+bad            = #dc322f
+busy           = #b58900
+
+# flags
+flag.pending   = #b58900
+flag.posted    = #859900
+flag.voided    = #dc322f
+flag.closed    = #dc322f
+flag.linked    = #6c71c4
+flag.history   = #268bd2
+flag.other     = #657b83
+
+# verdict
+status.posted  = #859900
+status.voided  = #dc322f
+status.expired = #657b83
+status.pending = #b58900
+status.unknown = #b58900
+
+# amounts
+net.negative   = #dc322f
+net.positive   = default
