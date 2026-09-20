@@ -144,6 +144,23 @@ mod tests {
     }
 
     #[test]
+    fn the_readme_documents_every_role() {
+        // Roles are the public surface of a theme file. One added without a line in the table is
+        // one nobody can discover, and the only place to look is the README.
+        let readme = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../README.md");
+        let text = std::fs::read_to_string(&readme)
+            .unwrap_or_else(|error| panic!("reading {}: {error}", readme.display()));
+
+        for &role in Role::ALL {
+            assert!(
+                text.contains(&format!("`{}`", role.name())),
+                "{} is not in the README's role table",
+                role.name()
+            );
+        }
+    }
+
+    #[test]
     fn a_role_indexes_its_own_slot() {
         let mut palette = Palette::blank();
         for &role in Role::ALL {

@@ -46,8 +46,76 @@ The same vocabulary as the macOS app, so a flag means one thing across both: **p
 net red. The wordmark top-right doubles as a status light — cyan when idle, yellow while a query is
 in flight, red when one failed.
 
-Colours are named ANSI colours, so they inherit whatever scheme your terminal already uses.
-`NO_COLOR=1`, or `--no-color`, drops to bold and reverse video only.
+By default those are named ANSI colours, so they inherit whatever scheme your terminal already
+uses. `NO_COLOR=1`, or `--no-color`, drops to bold and reverse video only — and wins over any
+theme.
+
+## Themes
+
+```sh
+tb-tui --list-themes            # ansi, mono, andromeda, catppuccin-mocha, dracula,
+                                # gruvbox-dark, nord, one-dark, solarized-dark, tokyo-night
+tb-tui --theme nord             # just this run
+```
+
+Or press `:` and type `theme` for a list you can arrow through. The screen repaints as you move,
+so you choose by looking; `enter` keeps it and `esc` puts back the one you arrived with. Keeping a
+theme writes `theme = nord` into `~/.config/tb-tui/config` — **the only file tb-tui ever writes**,
+and it never writes to a cluster.
+
+Everything else is a preset: `ansi` is what ships, and the other eight name hex colours, which a
+terminal without truecolor cannot show. Muted text in each is lifted to at least 3:1 against that
+theme's own background, because a hint you cannot read is not a hint.
+
+### Writing your own
+
+Start from one, and edit:
+
+```sh
+mkdir -p ~/.config/tb-tui/themes
+tb-tui --dump-theme nord > ~/.config/tb-tui/themes/mine.theme
+tb-tui --theme mine
+```
+
+A file in `~/.config/tb-tui/themes/` shadows the preset of the same name, so you can adjust `nord`
+without renaming it. A theme only has to name the roles it changes — everything else keeps its
+default, so this is a complete theme:
+
+```
+# ~/.config/tb-tui/themes/mine.theme
+border.focus = #88c0d0
+flag.pending = #ebcb8b bold
+```
+
+One role per line, `role = fg [on bg] [modifiers]`. A colour is a name (`cyan`, `bright_black`), a
+hex triplet (`#88c0d0`), a palette index (`0`–`255`), or `default` for whatever the terminal
+already uses. Modifiers are `bold`, `dim`, `italic`, `underline`, `reverse` and `crossed`. A line
+starting with `#` is a comment, and elsewhere `#` only begins one when a space follows — so
+`#88c0d0` stays a colour. Mistakes name their own line:
+
+```
+mine.theme:7: unknown role "boarder" — did you mean "border"?
+```
+
+The presets set a background on `text`; delete the `on …` to keep your terminal's own, transparency
+included.
+
+### The roles
+
+| Group | Roles |
+| --- | --- |
+| Base | `text` — painted under everything, so untyped text belongs to the theme too |
+| Chrome | `border`, `border.focus`, `title`, `title.scope`, `title.count`, `label`, `value`, `key`, `hint`, `logo`, `badge` |
+| Table | `table.header`, `table.cursor`, `table.stripe`, `table.id`, `table.number` |
+| State | `good`, `warn`, `bad`, `busy` |
+| Flags | `flag.pending`, `flag.posted`, `flag.voided`, `flag.closed`, `flag.linked`, `flag.history`, `flag.other` |
+| Verdict | `status.posted`, `status.voided`, `status.expired`, `status.pending`, `status.unknown` |
+| Amounts | `net.negative`, `net.positive` |
+
+`tb-tui --dump-theme` prints the lot with their current values. Which theme you get, highest first:
+`--theme`, `TB_TUI_THEME`, `~/.config/tb-tui/config`, then `ansi`. A theme named on the command
+line that will not load is an error; a broken one in the config is reported in the footer and
+ignored, because a preference should not stand between you and a cluster.
 
 ## Amounts
 
