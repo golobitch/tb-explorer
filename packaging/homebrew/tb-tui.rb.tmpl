@@ -3,8 +3,9 @@
 class TbTui < Formula
   desc "Read-only terminal browser for TigerBeetle clusters"
   homepage "https://golobitch.github.io/tb-explorer/"
-  version "{{VERSION}}"
   license "MIT"
+  # No `version`: Homebrew reads it from the asset name, and `brew audit --strict` rejects saying
+  # it twice. The cask still declares one, because a zip named after the app cannot be read that way.
 
   on_macos do
     on_arm do
