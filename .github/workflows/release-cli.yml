@@ -157,6 +157,10 @@ jobs:
   publish:
     needs: [version, build-macos, build-linux, deb]
     runs-on: ubuntu-24.04
+    # `secrets` is not a context a step's `if` can read, so availability is hoisted to the job,
+    # where it is. Job-level env may read secrets; a step-level `if` may not.
+    env:
+      TAP_TOKEN_SET: ${{ secrets.TAP_TOKEN != '' }}
     steps:
       # This job builds nothing, but the notes are written from the history, and checkout fetches
       # a single commit with no tags unless told otherwise.
@@ -208,7 +212,7 @@ jobs:
             })
 
       - name: Bump the tap
-        if: ${{ secrets.TAP_TOKEN != '' }}
+        if: env.TAP_TOKEN_SET == 'true'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.TAP_TOKEN }}
