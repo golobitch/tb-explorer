@@ -158,6 +158,12 @@ jobs:
     needs: [version, build-macos, build-linux, deb]
     runs-on: ubuntu-24.04
     steps:
+      # This job builds nothing, but the notes are written from the history, and checkout fetches
+      # a single commit with no tags unless told otherwise.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - uses: actions/download-artifact@v4
         with:
           path: assets
@@ -171,11 +177,20 @@ jobs:
           shasum -a 256 tb-tui-* > SHA256SUMS
           cat SHA256SUMS
 
+      # The notes are generated rather than left to GitHub: it picks the previous release by date
+      # rather than by tag prefix, so this one would baseline against whichever app release
+      # came last and list its commits too.
+      - name: Release notes
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: scripts/release-notes.sh "$GITHUB_REF_NAME" --out release-notes.md
+
       - uses: softprops/action-gh-release@v2
         with:
           name: tb-tui ${{ needs.version.outputs.version }}
           files: assets/*
-          generate_release_notes: true
+          body_path: release-notes.md
           # The macOS app keeps the Latest badge: the website's download button follows
           # /releases/latest, and so does the cask's livecheck.
           make_latest: false

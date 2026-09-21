@@ -17,6 +17,9 @@ jobs:
       SIGNING_ENABLED: ${{ secrets.MACOS_CERT_P12 != '' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The release notes are written from the history, which a shallow clone does not have.
+          fetch-depth: 0
 
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_16.3.app
@@ -111,13 +114,22 @@ jobs:
           ditto -c -k --keepParent "build/DerivedData/Build/Products/Release/TigerBeetle Explorer.app" TigerBeetle-Explorer-macos-universal.zip
           shasum -a 256 TigerBeetle-Explorer-macos-universal.zip > SHA256SUMS
 
+      # The notes are generated rather than left to GitHub: it picks the previous release by date
+      # rather than by tag prefix, so this one would baseline against whichever terminal UI release
+      # came last and list its commits too.
+      - name: Release notes
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: scripts/release-notes.sh "$GITHUB_REF_NAME" --out release-notes.md
+
       - uses: softprops/action-gh-release@v2
         with:
           name: TigerBeetle Explorer ${{ steps.version.outputs.version }}
           files: |
             TigerBeetle-Explorer-macos-universal.zip
             SHA256SUMS
-          generate_release_notes: true
+          body_path: release-notes.md
           # The website's download button follows /releases/latest, so the app keeps the badge.
           make_latest: true
 
