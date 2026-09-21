@@ -1280,7 +1280,7 @@ dependencies = [
 
 [[package]]
 name = "tb-tui"
-version = "0.0.2"
+version = "0.1.0"
 dependencies = [
  "crossterm",
  "ratatui",
@@ -1289,7 +1289,7 @@ dependencies = [
 
 [[package]]
 name = "tbclient"
-version = "0.0.2"
+version = "0.1.0"
 
 [[package]]
 name = "termina"
