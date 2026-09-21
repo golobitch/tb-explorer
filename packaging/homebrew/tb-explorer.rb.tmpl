@@ -6,7 +6,7 @@ cask "tb-explorer" do
   url "https://github.com/golobitch/tb-explorer/releases/download/ui-v#{version}/TigerBeetle-Explorer-macos-universal.zip",
       verified: "github.com/golobitch/tb-explorer/"
   name "TigerBeetle Explorer"
-  desc "Read-only macOS browser for TigerBeetle clusters"
+  desc "Read-only browser for TigerBeetle clusters"
   homepage "https://golobitch.github.io/tb-explorer/"
 
   livecheck do
@@ -17,14 +17,14 @@ cask "tb-explorer" do
     strategy :page_match
   end
 
-  depends_on macos: ">= :sequoia"
+  depends_on macos: :sequoia
 
   app "TigerBeetle Explorer.app"
 
   # The app is sandboxed, so its state lives in a container rather than loose in ~/Library.
   zap trash: [
-    "~/Library/Containers/com.golobitch.tb-explorer",
     "~/Library/Application Support/tb-explorer",
+    "~/Library/Containers/com.golobitch.tb-explorer",
     "~/Library/Preferences/com.golobitch.tb-explorer.plist",
     "~/Library/Saved Application State/com.golobitch.tb-explorer.savedState",
   ]
