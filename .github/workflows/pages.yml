@@ -47,6 +47,10 @@ jobs:
       # Skipped when the signing key is missing, because an unsigned repository is worse than none.
       - name: Build the apt repository
         if: ${{ env.APT_GPG_PRIVATE_KEY != '' }}
+        # The site is what this workflow is for. A signing key that will not import is worth a
+        # visible failure on the step, but not a website that stops deploying until it is fixed —
+        # which is what happened the first time this ran.
+        continue-on-error: true
         working-directory: ${{ github.workspace }}
         env:
           APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
