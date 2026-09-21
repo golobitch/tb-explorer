@@ -1,0 +1,55 @@
+# Catppuccin Mocha — catppuccin.com
+#
+# Flags keep their meaning across every theme: pending is this palette's yellow,
+# voided and closed its red, linked its purple, history its blue — the same vocabulary
+# the macOS app uses. Delete the `on …` from `text` to keep your terminal's own
+# background (and its transparency).
+
+# base
+text           = #cdd6f4 on #1e1e2e
+
+# chrome
+border         = #45475a
+border.focus   = #89b4fa
+title          = #f5e0dc bold
+title.scope    = #89b4fa
+title.count    = #6c7086
+label          = #6c7086
+value          = #f5e0dc bold
+key            = #89b4fa bold
+hint           = #6c7086
+logo           = #89b4fa
+badge          = #1e1e2e on #a6e3a1 bold
+
+# table
+table.header   = #89b4fa bold
+table.cursor   = #1e1e2e on #89b4fa bold
+table.stripe   = on #313244
+table.id       = #89dceb
+table.number   = default
+
+# state
+good           = #a6e3a1
+warn           = #f9e2af
+bad            = #f38ba8
+busy           = #f9e2af
+
+# flags
+flag.pending   = #f9e2af
+flag.posted    = #a6e3a1
+flag.voided    = #f38ba8
+flag.closed    = #f38ba8
+flag.linked    = #cba6f7
+flag.history   = #89b4fa
+flag.other     = #6c7086
+
+# verdict
+status.posted  = #a6e3a1
+status.voided  = #f38ba8
+status.expired = #6c7086
+status.pending = #f9e2af
+status.unknown = #f9e2af
+
+# amounts
+net.negative   = #f38ba8
+net.positive   = default

@@ -1,0 +1,54 @@
+# ansi — what tb-tui ships with
+#
+# Named ANSI colours, so the UI inherits whatever scheme your terminal already uses and stays
+# readable on a light background. The presets that name hex colours cannot do that, which is why
+# this one is the default.
+
+# base
+text           = default
+
+# chrome
+border         = dark_gray
+border.focus   = cyan
+title          = white bold
+title.scope    = cyan
+title.count    = dark_gray
+label          = dark_gray
+value          = default bold
+key            = cyan bold
+hint           = dark_gray
+logo           = cyan
+badge          = black on green bold
+
+# table
+table.header   = cyan bold
+table.cursor   = default reverse
+table.stripe   = default on 235
+table.id       = gray
+table.number   = default
+
+# state
+good           = green
+warn           = yellow
+bad            = red
+busy           = yellow
+
+# flags
+flag.pending   = yellow
+flag.posted    = green
+flag.voided    = red
+flag.closed    = red
+flag.linked    = magenta
+flag.history   = blue
+flag.other     = dark_gray
+
+# verdict
+status.posted  = green
+status.voided  = red
+status.expired = dark_gray
+status.pending = yellow
+status.unknown = yellow
+
+# amounts
+net.negative   = red
+net.positive   = default

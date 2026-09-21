@@ -16,7 +16,7 @@ fn app() -> App {
         0,
         "127.0.0.1:3000".to_string(),
         Worker::detached(),
-        crate::theme::Theme::detect(false),
+        crate::theme::Theme::colourful(),
     )
 }
 
@@ -26,7 +26,20 @@ fn plain_app() -> App {
         0,
         "127.0.0.1:3000".to_string(),
         Worker::detached(),
-        crate::theme::Theme::detect(true),
+        crate::theme::Theme::monochrome(),
+    )
+}
+
+/// An app wearing a theme file, for checking that what a file says reaches the screen.
+fn themed_app(theme_file: &str) -> App {
+    let palette =
+        crate::theme::parse::parse(theme_file, "test.theme", crate::theme::default_palette())
+            .expect("the test theme parses");
+    App::new(
+        0,
+        "127.0.0.1:3000".to_string(),
+        Worker::detached(),
+        crate::theme::Theme::from_palette(palette),
     )
 }
 
@@ -743,4 +756,192 @@ fn a_filtered_list_does_not_page_behind_the_filter() {
         !app.loading,
         "the end of a filtered view is not the end of the query"
     );
+}
+
+#[test]
+fn a_theme_file_reaches_the_screen() {
+    use ratatui::style::{Color, Modifier};
+
+    let mut app =
+        themed_app("table.header = #88c0d0 bold\nflag.pending = #ebcb8b\ntext = #d8dee9\n");
+    app.loading = false;
+    app.view = View::Transfers;
+    app.rows = Rows::Transfers(vec![Transfer {
+        id: 100_539,
+        flags: tbclient::models::transfer_flags::PENDING,
+        ..Default::default()
+    }]);
+
+    let header = style_of(&app, 130, 12, "id");
+    assert_eq!(header.fg, Some(Color::Rgb(0x88, 0xc0, 0xd0)));
+    assert!(header.add_modifier.contains(Modifier::BOLD));
+    assert_eq!(
+        style_of(&app, 130, 12, "pending").fg,
+        Some(Color::Rgb(0xeb, 0xcb, 0x8b))
+    );
+}
+
+#[test]
+fn the_base_colour_reaches_text_that_carries_no_style_of_its_own() {
+    use ratatui::style::Color;
+
+    let mut app = themed_app("text = #d8dee9\n");
+    app.loading = false;
+    app.mode = Mode::Command;
+    app.input = "transfer 100539".to_string();
+
+    // The typed command is a raw span: without a base coat it would keep the terminal's own
+    // foreground while every framed thing around it turned Nord.
+    assert_eq!(
+        style_of(&app, 130, 12, "transfer 100539").fg,
+        Some(Color::Rgb(0xd8, 0xde, 0xe9))
+    );
+}
+
+/// The theme list, on an app whose config directory is a scratch one — a test must never write
+/// into the config of whoever is running it.
+mod themes {
+    use super::*;
+    use ratatui::style::Color;
+
+    struct Scratch(std::path::PathBuf);
+
+    impl Scratch {
+        fn new(name: &str) -> Self {
+            let path =
+                std::env::temp_dir().join(format!("tb-tui-app-{name}-{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&path);
+            std::fs::create_dir_all(&path).unwrap();
+            Self(path)
+        }
+    }
+
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn picking(scratch: &Scratch) -> App {
+        let mut app = app();
+        app.loading = false;
+        app.config = Some(scratch.0.clone());
+        app
+    }
+
+    #[test]
+    fn the_list_offers_every_preset_and_previews_as_it_moves() {
+        let scratch = Scratch::new("preview");
+        let mut app = picking(&scratch);
+        app.show_themes();
+
+        let picker = app.themes.as_ref().expect("the list is open");
+        assert_eq!(picker.names.first().map(String::as_str), Some("ansi"));
+        assert!(picker.names.iter().any(|name| name == "nord"));
+        assert_eq!(app.mode, Mode::Themes);
+
+        let nord = picker.names.iter().position(|name| name == "nord").unwrap();
+        app.move_theme(nord as isize);
+        assert_eq!(
+            app.theme.header.fg,
+            Some(Color::Rgb(0x88, 0xc0, 0xd0)),
+            "moving the selection did not repaint the screen"
+        );
+        assert!(
+            render(&app, 130, 24).contains("nord"),
+            "the list is not on screen"
+        );
+    }
+
+    #[test]
+    fn keeping_a_theme_writes_it_and_esc_puts_the_old_one_back() {
+        let scratch = Scratch::new("keep");
+        let mut app = picking(&scratch);
+        let before = app.theme.header.fg;
+
+        app.show_themes();
+        let nord = app
+            .themes
+            .as_ref()
+            .unwrap()
+            .names
+            .iter()
+            .position(|name| name == "nord")
+            .unwrap();
+        app.move_theme(nord as isize);
+        app.keep_theme();
+
+        assert_eq!(app.mode, Mode::Normal);
+        assert_eq!(
+            crate::config::theme(&scratch.0).as_deref(),
+            Some("nord"),
+            "the choice was not written down"
+        );
+
+        app.show_themes();
+        app.move_theme(1);
+        app.cancel_themes();
+        assert_eq!(app.mode, Mode::Normal);
+        assert_eq!(app.theme.header.fg, Some(Color::Rgb(0x88, 0xc0, 0xd0)));
+
+        assert_eq!(
+            before,
+            Some(Color::Cyan),
+            "the fixture was not the ansi theme"
+        );
+    }
+
+    #[test]
+    fn a_theme_of_your_own_shadows_the_preset_it_is_named_after() {
+        let scratch = Scratch::new("shadow");
+        std::fs::create_dir_all(scratch.0.join("themes")).unwrap();
+        std::fs::write(
+            scratch.0.join("themes/nord.theme"),
+            "table.header = #ff0000\n",
+        )
+        .unwrap();
+
+        let mut app = picking(&scratch);
+        app.choose_theme("nord");
+
+        assert_eq!(
+            app.theme.header.fg,
+            Some(Color::Rgb(0xff, 0, 0)),
+            "the preset won over the user's own file"
+        );
+        assert_eq!(
+            app.theme.logo.fg,
+            Some(Color::Cyan),
+            "a one-line theme should inherit the rest from the default"
+        );
+
+        let names = crate::theme::available(Some(&scratch.0));
+        assert_eq!(
+            names.iter().filter(|name| *name == "nord").count(),
+            1,
+            "nord is listed twice"
+        );
+    }
+
+    #[test]
+    fn naming_a_theme_that_does_not_exist_says_so_and_changes_nothing() {
+        let scratch = Scratch::new("missing");
+        let mut app = picking(&scratch);
+        let before = app.theme.header.fg;
+
+        app.choose_theme("nope");
+
+        assert_eq!(app.theme.header.fg, before);
+        assert!(
+            app.status
+                .as_deref()
+                .is_some_and(|status| status.contains("nope")),
+            "no complaint about an unknown theme: {:?}",
+            app.status
+        );
+        assert!(
+            !scratch.0.join("config").exists(),
+            "wrote a config for a theme that does not exist"
+        );
+    }
 }

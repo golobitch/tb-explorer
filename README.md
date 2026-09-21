@@ -12,7 +12,7 @@ the build if either string appears in a front end. The only code that writes to 
 | Folder | What it is |
 | ------ | ---------- |
 | [`ui/`](ui) | The native macOS app (SwiftUI). Point it at a cluster and browse. |
-| [`cli/`](cli) | A terminal UI (Rust, ratatui) with k9s-style navigation, for the machine the cluster runs on. macOS and Linux. |
+| [`cli/`](cli) | A terminal UI (Rust, ratatui) with k9s-style navigation, for the machine the cluster runs on. macOS and Linux, and [themeable](cli/README.md#themes) — Nord, Dracula, One Dark and seven more, or write your own. |
 | [`website/`](website) | The landing page (Astro), deployed to GitHub Pages. |
 
 Both front ends talk to TigerBeetle through the official C client (`tb_client`), vendored once in

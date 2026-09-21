@@ -20,6 +20,13 @@ const COMPACT_HEIGHT: u16 = 20;
 const COMPACT_WIDTH: u16 = 100;
 
 pub fn draw(frame: &mut Frame, app: &App) {
+    // The base coat. Spans that carry no colour of their own — typed input, error text, most
+    // ledger cells — would otherwise keep the terminal's foreground while everything around them
+    // changed theme. ratatui patches styles rather than replacing them, so a span with `fg: None`
+    // leaves this standing and one with a colour still wins.
+    let area = frame.area();
+    frame.buffer_mut().set_style(area, app.theme.text);
+
     let compact = frame.area().height < COMPACT_HEIGHT || frame.area().width < COMPACT_WIDTH;
     let header_height = if compact { 1 } else { 7 };
 
@@ -42,6 +49,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
     match app.mode {
         Mode::Help => overlay::help(frame, frame.area(), app),
         Mode::Commands => overlay::commands(frame, frame.area(), app),
+        Mode::Themes => overlay::themes(frame, frame.area(), app),
         _ => {}
     }
 }

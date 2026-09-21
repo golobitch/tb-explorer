@@ -1,0 +1,53 @@
+# mono — no colour at all
+#
+# What NO_COLOR and --no-color select. Hierarchy comes from bold, dim and reverse video, which is
+# all a pipe, a log or a monochrome terminal can carry.
+
+# base
+text           = default
+
+# chrome
+border         = default dim
+border.focus   = default bold
+title          = default bold
+title.scope    = default
+title.count    = default dim
+label          = default dim
+value          = default bold
+key            = default bold
+hint           = default dim
+logo           = default
+badge          = default reverse
+
+# table
+table.header   = default bold
+table.cursor   = default reverse
+table.stripe   = default
+table.id       = default
+table.number   = default
+
+# state
+good           = default
+warn           = default bold
+bad            = default bold
+busy           = default dim
+
+# flags
+flag.pending   = default
+flag.posted    = default
+flag.voided    = default
+flag.closed    = default
+flag.linked    = default
+flag.history   = default
+flag.other     = default
+
+# verdict
+status.posted  = default bold
+status.voided  = default bold
+status.expired = default bold
+status.pending = default bold
+status.unknown = default bold
+
+# amounts
+net.negative   = default bold
+net.positive   = default

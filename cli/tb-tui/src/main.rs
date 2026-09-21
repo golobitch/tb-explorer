@@ -1,6 +1,7 @@
 //! A read-only terminal browser for TigerBeetle clusters.
 
 mod app;
+mod config;
 #[cfg(test)]
 mod tests;
 mod theme;
@@ -27,6 +28,12 @@ struct Options {
     plain: bool,
     /// The size `--dump` renders at, so a narrow terminal can be checked without one.
     size: (u16, u16),
+    /// A theme by name or by path. Overrides whatever the config file says.
+    theme: Option<String>,
+    /// Print a theme as a file and exit, which is how you start editing one.
+    dump_theme: Option<Option<String>>,
+    /// List what `--theme` accepts and exit.
+    list_themes: bool,
 }
 
 fn parse_options() -> Result<Options, String> {
@@ -35,7 +42,10 @@ fn parse_options() -> Result<Options, String> {
     let mut dump = None;
     let mut plain = false;
     let mut size = (130u16, 20u16);
-    let mut args = std::env::args().skip(1);
+    let mut theme = None;
+    let mut dump_theme = None;
+    let mut list_themes = false;
+    let mut args = std::env::args().skip(1).peekable();
 
     while let Some(arg) = args.next() {
         match arg.as_str() {
@@ -60,10 +70,17 @@ fn parse_options() -> Result<Options, String> {
             "--dump" => {
                 dump = Some(args.next().unwrap_or_else(|| "accounts".to_string()));
             }
+            "--theme" => {
+                theme = Some(args.next().ok_or("--theme needs a name or a path")?);
+            }
+            "--dump-theme" => {
+                // The name is optional, so only take the next argument when it is one.
+                let named = args.peek().is_some_and(|next| !next.starts_with('-'));
+                dump_theme = Some(named.then(|| args.next().expect("peeked")));
+            }
+            "--list-themes" => list_themes = true,
             "--help" | "-h" => {
-                println!(
-                    "tb-tui [--addresses 127.0.0.1:3000] [--cluster 0] [--dump accounts|transfers|ledgers|help]"
-                );
+                println!("{HELP}");
                 std::process::exit(0);
             }
             other => return Err(format!("unknown argument {other}")),
@@ -75,7 +92,58 @@ fn parse_options() -> Result<Options, String> {
         dump,
         plain,
         size,
+        theme,
+        dump_theme,
+        list_themes,
     })
+}
+
+/// `--help` is the only documentation someone has in the moment, so it names every flag.
+const HELP: &str = "\
+tb-tui — a read-only terminal browser for TigerBeetle
+
+  -a, --addresses <list>   replica addresses (default 127.0.0.1:3000)
+  -c, --cluster <id>       cluster id (default 0)
+      --theme <name|path>  colours, by preset name or theme file
+      --list-themes        every theme this binary knows
+      --dump-theme [name]  print a theme as a file, to edit and keep
+      --no-color           no colour at all; NO_COLOR does the same
+      --dump [view]        render one frame as text and exit
+                           accounts|transfers|ledgers|help|account:1015|transfer:100539
+      --size <WxH>         the size --dump renders at (default 130x20)
+  -h, --help               this";
+
+/// Colour off beats every theme: `NO_COLOR` is a promise, not a preference, so a theme can never
+/// turn colour back on.
+///
+/// Everything else is a preference, and preferences have an order: the flag, then the environment,
+/// then the config file, then the palette tb-tui ships with. The `Err` case is only for a theme
+/// the user named on the command line — a broken config file is reported, not obeyed, because a
+/// bad preference should never stand between you and a cluster.
+fn resolve_theme(
+    options: &Options,
+    config: Option<&std::path::Path>,
+) -> Result<(Theme, Option<String>), String> {
+    if Theme::plain_wanted(options.plain) {
+        return Ok((Theme::monochrome(), None));
+    }
+
+    if let Some(spec) = options
+        .theme
+        .clone()
+        .or_else(|| std::env::var("TB_TUI_THEME").ok())
+    {
+        return Ok((Theme::from_palette(theme::resolve(&spec, config)?), None));
+    }
+
+    let Some(spec) = config.and_then(config::theme) else {
+        return Ok((Theme::colourful(), None));
+    };
+
+    match theme::resolve(&spec, config) {
+        Ok(palette) => Ok((Theme::from_palette(palette), None)),
+        Err(message) => Ok((Theme::colourful(), Some(message))),
+    }
 }
 
 fn main() {
@@ -87,6 +155,46 @@ fn main() {
         }
     };
 
+    // Everything about colour is answered before a socket is opened, so `--dump-theme` and
+    // `--list-themes` work on a machine that has no cluster to reach.
+    if options.list_themes {
+        for preset in theme::preset::ALL {
+            // The mark is the one thing worth saying: a hex theme is unreadable where truecolor
+            // is not available, and ratatui will not downgrade it.
+            let mark = if preset.truecolor {
+                "  (truecolor)"
+            } else {
+                ""
+            };
+            println!("{}{mark}", preset.name);
+        }
+        return;
+    }
+
+    let config = config::directory();
+    let (theme, complaint) = match resolve_theme(&options, config.as_deref()) {
+        Ok(resolved) => resolved,
+        Err(message) => {
+            eprintln!("tb-tui: {message}");
+            std::process::exit(2);
+        }
+    };
+
+    if let Some(requested) = &options.dump_theme {
+        let palette = match requested {
+            Some(name) => match theme::resolve(name, config.as_deref()) {
+                Ok(palette) => palette,
+                Err(message) => {
+                    eprintln!("tb-tui: {message}");
+                    std::process::exit(2);
+                }
+            },
+            None => theme.palette,
+        };
+        print!("{}", theme::parse::dump(&palette));
+        return;
+    }
+
     let client = match Client::connect(options.cluster_id, &options.addresses) {
         Ok(client) => Arc::new(client),
         Err(error) => {
@@ -96,12 +204,11 @@ fn main() {
     };
 
     let worker = Worker::spawn(Arc::clone(&client));
-    let mut app = App::new(
-        options.cluster_id,
-        options.addresses.clone(),
-        worker,
-        Theme::detect(options.plain),
-    );
+    let mut app = App::new(options.cluster_id, options.addresses.clone(), worker, theme);
+    // A theme that would not load is worth saying out loud, but only once and only in the footer:
+    // it is a preference, and you came here to read a cluster.
+    app.status = complaint;
+    app.config = config;
 
     if let Some(view) = options.dump {
         print!("{}", dump_frame(&mut app, &view, options.size));
@@ -197,6 +304,19 @@ fn handle_key(app: &mut App, key: KeyEvent) {
             KeyCode::Char('r') => app.reload(),
             KeyCode::Char('a') => app.show_commands(),
             KeyCode::Char('c') => app.quit = true,
+            _ => {}
+        }
+        return;
+    }
+
+    // The theme list is modal: moving the selection repaints the screen, so the keys that move it
+    // cannot also be doing their usual jobs underneath.
+    if app.mode == Mode::Themes {
+        match key.code {
+            KeyCode::Esc | KeyCode::Char('q') => app.cancel_themes(),
+            KeyCode::Enter => app.keep_theme(),
+            KeyCode::Char('j') | KeyCode::Down => app.move_theme(1),
+            KeyCode::Char('k') | KeyCode::Up => app.move_theme(-1),
             _ => {}
         }
         return;

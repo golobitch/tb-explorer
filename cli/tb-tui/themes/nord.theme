@@ -1,0 +1,55 @@
+# Nord — nordtheme.com
+#
+# Flags keep their meaning across every theme: pending is this palette's yellow,
+# voided and closed its red, linked its purple, history its blue — the same vocabulary
+# the macOS app uses. Delete the `on …` from `text` to keep your terminal's own
+# background (and its transparency).
+
+# base
+text           = #d8dee9 on #2e3440
+
+# chrome
+border         = #434c5e
+border.focus   = #88c0d0
+title          = #eceff4 bold
+title.scope    = #88c0d0
+title.count    = #7b8291
+label          = #7b8291
+value          = #eceff4 bold
+key            = #88c0d0 bold
+hint           = #7b8291
+logo           = #88c0d0
+badge          = #2e3440 on #a3be8c bold
+
+# table
+table.header   = #88c0d0 bold
+table.cursor   = #2e3440 on #88c0d0 bold
+table.stripe   = on #3b4252
+table.id       = #81a1c1
+table.number   = default
+
+# state
+good           = #a3be8c
+warn           = #ebcb8b
+bad            = #bf616a
+busy           = #ebcb8b
+
+# flags
+flag.pending   = #ebcb8b
+flag.posted    = #a3be8c
+flag.voided    = #bf616a
+flag.closed    = #bf616a
+flag.linked    = #b48ead
+flag.history   = #5e81ac
+flag.other     = #7b8291
+
+# verdict
+status.posted  = #a3be8c
+status.voided  = #bf616a
+status.expired = #7b8291
+status.pending = #ebcb8b
+status.unknown = #ebcb8b
+
+# amounts
+net.negative   = #bf616a
+net.positive   = default
